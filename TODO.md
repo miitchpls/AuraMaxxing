@@ -79,3 +79,9 @@ A catalogue of building layouts. Each entry shows a picture of the arrangement
 and its price — a small block of cities and factories, for instance. Click one
 and, if there is enough room, it builds the structures according to that preset.
 Presets you cannot currently afford appear disabled.
+
+## Automatic messages
+
+Something that fires messages on its own when a condition is met. First one
+could be sending an SOS emoji to allies when you are under attack and low on
+troops. The rest of the triggers are still to be defined.
