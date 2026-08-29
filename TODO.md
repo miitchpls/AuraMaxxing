@@ -28,3 +28,19 @@ warns you when a sleeping cell is sitting near you.
 An on/off toggle. Turning it on sends an alliance request to everyone, and while
 it stays on it keeps accepting alliance renewal requests and sending them out to
 other players.
+
+## Cheap structure loop
+
+Structure prices climb with how many you already own: the first city costs 125k,
+the second 250k, and so on. Losing a structure drops the count, so the next one
+is cheap again.
+
+A mode that farms this at the start of a game. It spawns next to a tribe and
+holds a deliberate balance: few enough troops that the tribe keeps attacking it,
+enough gold to keep rebuilding. Place a cheap structure near the border, let the
+tribe take it, place another one at the same low price, and retake the territory
+before the structures get deleted. The result is a lot of early structures for
+far less gold than paying the rising price.
+
+It needs a rough model of how the tribe AI decides to attack, and probably
+reading tribe ids out of the game state in the browser.
