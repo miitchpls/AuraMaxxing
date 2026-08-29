@@ -10,7 +10,11 @@ const PANEL_CLASS =
   "fixed z-900 flex flex-col p-2 bg-gray-800/92 backdrop-blur-sm shadow-xs rounded-lg text-white select-none";
 const TOGGLE_CLASS =
   "cursor-pointer px-1 bg-gray-700/50 hover:bg-gray-600 border rounded-md border-slate-500 transition-colors";
-const SECTION_HEADER_CLASS = `flex items-center gap-2 w-full text-sm py-1 ${TOGGLE_CLASS}`;
+// One card per feature: the section is the card, everything it needs lives
+// inside it, and nothing else in the panel draws a box of its own.
+const SECTION_CLASS =
+  "flex flex-col p-2 bg-gray-900/60 border border-slate-500 rounded-md";
+const SECTION_HEADER_CLASS = "flex items-center gap-2 text-sm";
 
 const clamp = (value, max) => Math.max(0, Math.min(value, max));
 
@@ -66,7 +70,7 @@ export const addSection = ({ id, title, body }) => {
 
   const section = document.createElement("div");
   section.id = `auramaxxing-section-${id}`;
-  section.className = "flex flex-col";
+  section.className = SECTION_CLASS;
   section.innerHTML = `
     <div class="${SECTION_HEADER_CLASS}">
       <span>${title}</span>
