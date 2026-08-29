@@ -54,7 +54,7 @@ A version that also weighs the terrain to suggest a best spawn point was
 considered, but empty ground is not automatically better: an area with nobody in
 it means no trade early on.
 
-## Attack timing
+## PeakMaxxing
 
 Troops are generated along a bell curve. Read that algorithm and use it to tell
 you the best moments to attack: stay at the peak of the curve and attack with
