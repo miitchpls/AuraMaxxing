@@ -94,8 +94,12 @@ To avoid depending on that, run this **in the page console** when driving the
 browser:
 
 ```js
+await import("/AuraMaxxing/src/world/gameBridge.js");
 await import("/AuraMaxxing/src/main.js");
 ```
+
+The bridge is loaded separately because the manifest, not `main.js`, injects it —
+skip it and every tier 2 feature reports itself unavailable.
 
 This folder sits inside the root Vite serves, so it loads whatever is on disk
 right now, with no reload step.
