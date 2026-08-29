@@ -8,6 +8,7 @@ import {
   releasePointer,
 } from "../api/input.js";
 import { inspect, quote } from "../api/game.js";
+import { reserveIntent } from "../api/rateLimit.js";
 import { addSection } from "../ui/panel.js";
 
 const LABELS = {
@@ -59,7 +60,9 @@ export const planBatches = (action, count, firstIsBuild) => {
   return firstIsBuild ? [1, ...chunk(count - 1)] : chunk(count);
 };
 
-const runBatch = async (action, size, x, y) => {
+// Only the confirm reaches the server; the key presses stay in the client. So
+// the intent budget is claimed right before confirming, never for a whole batch.
+const runBatch = async (action, size, x, y, onWait) => {
   pressEscape();
   await wait(KEY_DELAY_MS);
   pressBuildKey(action);
@@ -68,6 +71,7 @@ const runBatch = async (action, size, x, y) => {
     pressBuildKey(action);
   }
   await wait(KEY_DELAY_MS);
+  await reserveIntent(onWait);
   confirmBuild();
   await wait(BUILD_DELAY_MS);
 };
@@ -235,7 +239,9 @@ const start = async (body) => {
           status.textContent = `Stopped at ${done}: ${blocked}`;
           break;
         }
-        await runBatch(action, size, point.x, point.y);
+        await runBatch(action, size, point.x, point.y, () => {
+          status.textContent = `${done}/${count} — pacing`;
+        });
         done += size;
         status.textContent = `${done}/${count}`;
       }

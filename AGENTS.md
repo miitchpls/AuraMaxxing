@@ -146,6 +146,23 @@ compiles only the classes it finds scanning the game's `src/`, and this folder i
 gitignored so it is never scanned: an invented class produces nothing. Grep the
 game's `src/` before using one that is not already here.
 
+## Server rate limits
+
+The server drops intents past **10 per second** or **150 per minute**, and drops
+them *silently* — no error, no retry, the action simply never happened
+(`src/server/ClientMsgRateLimiter.ts`, enforced in `SocketIngress.ts`). An intent
+over 2000 bytes, or 5MB sent in total, is a kick rather than a drop.
+
+The per-minute figure is the real constraint: 150/min averages 2.5/s, so a burst
+at 10/s runs dry in about fifteen seconds.
+
+Anything that sends intents on its own goes through `api/rateLimit.js`, which
+paces to a fraction of both limits so the player keeps budget for their own
+moves. Never send in a tight loop, and never assume an intent landed.
+
+Batching beats pacing where the game offers it: the x5 build multiplier folds
+five actions into one intent.
+
 ## Panel UI
 
 There is one window, `AuraMaxxing`, and every feature is exactly one card inside

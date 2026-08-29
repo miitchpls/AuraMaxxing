@@ -1,9 +1,10 @@
 import * as dom from "./api/dom.js";
 import * as game from "./api/game.js";
 import * as input from "./api/input.js";
+import * as rateLimit from "./api/rateLimit.js";
 import buildMaxxing from "./features/buildMaxxing.js";
 
-const api = { dom, game, input };
+const api = { dom, game, input, rateLimit };
 const features = [buildMaxxing];
 
 for (const feature of features) {

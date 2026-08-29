@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node test/planBatches.test.js && node test/projectCost.test.js"
+    "test": "node test/planBatches.test.js && node test/projectCost.test.js && node test/rateLimit.test.js"
   }
 }
