@@ -1,8 +1,9 @@
 import * as dom from "./api/dom.js";
-import panel from "./features/panel.js";
+import * as input from "./api/input.js";
+import buildMaxxing from "./features/buildMaxxing.js";
 
-const api = { dom };
-const features = [panel];
+const api = { dom, input };
+const features = [buildMaxxing];
 
 for (const feature of features) {
   const missing = feature.requires.filter((name) => !api[name].available());
