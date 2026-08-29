@@ -270,7 +270,7 @@ const buildBody = () => {
         (action) => `<option value="${action}">${LABELS[action]}</option>`,
       ).join("")}
     </select>
-    <input type="number" min="1" step="1" value="10"
+    <input type="number" min="1" step="1" value="1"
       class="w-full px-1 py-1 bg-gray-700/50 border border-slate-500 rounded-md text-white" data-count />
     <button class="w-full px-1 py-1 cursor-pointer bg-gray-700/50 hover:bg-gray-600 border border-slate-500 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed" data-run>
       Activate
@@ -370,7 +370,6 @@ const start = async (body) => {
   const signal = run.controller.signal;
   activeRun = run;
   button.textContent = "Cancel";
-  body.querySelector("[data-cost]").textContent = "";
   status.textContent = "Click the target tile";
 
   let cursor = null;
