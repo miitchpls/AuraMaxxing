@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "AuraMaxxing",
+  "version": "0.1.0",
+  "description": "Extra features for OpenFront.",
+  "content_scripts": [
+    {
+      "matches": ["https://*.openfront.io/*", "http://localhost/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
