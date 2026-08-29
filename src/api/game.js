@@ -46,6 +46,7 @@ export const inspect = (x, y, action, count = 1) =>
     screenX: x,
     screenY: y,
     unitType: BUILDABLES[action].unitType,
+    usesMissile: BUILDABLES[action].usesMissile === true,
     count,
   });
 

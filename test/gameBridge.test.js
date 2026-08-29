@@ -14,8 +14,10 @@ globalThis.CustomEvent = TestCustomEvent;
 globalThis.window = new EventTarget();
 
 let buildables = [];
+let ownedUnits = [];
 const player = {
   buildables: async () => buildables,
+  units: () => ownedUnits,
   gold: () => 4000000n,
   readyMissileCount: () => 4,
 };
@@ -37,7 +39,7 @@ globalThis.document = {
 await import("../src/world/gameBridge.js");
 
 let nextId = 0;
-const inspect = (unitType, count) =>
+const inspect = (unitType, count, usesMissile = false) =>
   new Promise((resolve) => {
     const id = ++nextId;
     const onResponse = (event) => {
@@ -55,6 +57,7 @@ const inspect = (unitType, count) =>
           screenX: 10,
           screenY: 20,
           unitType,
+          usesMissile,
           count,
         }),
       }),
@@ -75,10 +78,19 @@ buildables = [
     upgradeCosts: [250000n, 750000n, 1500000n, 2500000n, 3500000n],
   },
 ];
+ownedUnits = [
+  { id: () => 1, level: () => 4 },
+  { id: () => 2, level: () => 2 },
+];
 const upgrade = await inspect("City", 5);
 assert.equal(upgrade.batchCost, "3500000");
 assert.equal(upgrade.canBuild, false);
 assert.equal(upgrade.canUpgrade, true);
+assert.equal(upgrade.targetUnitId, 1);
+assert.deepEqual(upgrade.units, [
+  { id: 1, level: 4 },
+  { id: 2, level: 2 },
+]);
 
 buildables = [
   {
@@ -87,7 +99,8 @@ buildables = [
     cost: 750000n,
   },
 ];
-const atomBombs = await inspect("Atom Bomb", 5);
+ownedUnits = [];
+const atomBombs = await inspect("Atom Bomb", 5, true);
 assert.equal(atomBombs.batchCost, "3750000");
 assert.equal(atomBombs.readyMissiles, 4);
 

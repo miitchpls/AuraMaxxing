@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   batchAffordable,
+  confirmedBatchAmount,
   parseCount,
   planBatches,
 } from "../src/features/buildMaxxing.js";
@@ -28,6 +29,45 @@ assert.equal(
   batchAffordable({ ...escalatingBatch, gold: "1875000" }, "buildCity", 5),
   true,
 );
+
+const units = (...pairs) => pairs.map(([id, level]) => ({ id, level }));
+
+assert.equal(
+  confirmedBatchAmount(
+    { targetUnitId: 7, units: units([7, 3]), readyMissiles: null },
+    { targetUnitId: 7, units: units([7, 8]), readyMissiles: null },
+    "buildCity",
+  ),
+  5,
+);
+assert.equal(
+  confirmedBatchAmount(
+    { targetUnitId: 7, units: units([7, 3]), readyMissiles: null },
+    { targetUnitId: null, units: [], readyMissiles: null },
+    "buildCity",
+  ),
+  0,
+);
+assert.equal(
+  confirmedBatchAmount(
+    { targetUnitId: null, units: units([2, 1]), readyMissiles: null },
+    {
+      targetUnitId: null,
+      units: units([2, 1], [9, 1]),
+      readyMissiles: null,
+    },
+    "buildWarship",
+  ),
+  1,
+);
+assert.equal(
+  confirmedBatchAmount(
+    { targetUnitId: null, units: [], readyMissiles: 8 },
+    { targetUnitId: null, units: [], readyMissiles: 3 },
+    "buildAtomBomb",
+  ),
+  5,
+);
 assert.equal(
   batchAffordable(
     { gold: "3750000", batchCost: "3750000", readyMissiles: 4 },
@@ -41,6 +81,22 @@ assert.equal(
     { gold: "3750000", batchCost: "3750000", readyMissiles: 5 },
     "buildAtomBomb",
     5,
+  ),
+  true,
+);
+assert.equal(
+  batchAffordable(
+    { gold: "5000000", batchCost: "5000000", readyMissiles: 0 },
+    "buildHydrogenBomb",
+    1,
+  ),
+  false,
+);
+assert.equal(
+  batchAffordable(
+    { gold: "25000000", batchCost: "25000000", readyMissiles: 1 },
+    "buildMIRV",
+    1,
   ),
   true,
 );

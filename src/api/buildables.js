@@ -22,13 +22,24 @@ export const BUILDABLES = {
     batching: "upgrade",
   },
   buildWarship: { key: "Digit7", unitType: "Warship", batching: "none" },
-  buildAtomBomb: { key: "Digit8", unitType: "Atom Bomb", batching: "build" },
+  buildAtomBomb: {
+    key: "Digit8",
+    unitType: "Atom Bomb",
+    batching: "build",
+    usesMissile: true,
+  },
   buildHydrogenBomb: {
     key: "Digit9",
     unitType: "Hydrogen Bomb",
     batching: "none",
+    usesMissile: true,
   },
-  buildMIRV: { key: "Digit0", unitType: "MIRV", batching: "none" },
+  buildMIRV: {
+    key: "Digit0",
+    unitType: "MIRV",
+    batching: "none",
+    usesMissile: true,
+  },
 };
 
 export const BUILD_ACTIONS = Object.keys(BUILDABLES);

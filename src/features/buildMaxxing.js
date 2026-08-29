@@ -26,8 +26,9 @@ const LABELS = {
 const BATCH_SIZE = 5;
 
 const KEY_DELAY_MS = 100;
-const BUILD_DELAY_MS = 300;
 const POLL_INTERVAL_MS = 500;
+const CONFIRM_INTERVAL_MS = 100;
+const CONFIRM_TIMEOUT_MS = 5000;
 // Gold accrues while the panel sits idle, so the price and the button's enabled
 // state are refreshed on a slow timer rather than only when a field changes.
 const COST_REFRESH_MS = 2000;
@@ -72,7 +73,7 @@ export const planBatches = (action, count, firstIsBuild) => {
 
 // Only the confirm reaches the server; the key presses stay in the client. So
 // the batch queues at the tunnel once, right at the end, never as a whole.
-const runBatch = async (action, size, x, y, signal, onWait) => {
+const runBatch = async (action, size, signal, onWait) => {
   if (signal.aborted) throw signal.reason;
   pressEscape();
   await wait(KEY_DELAY_MS, signal);
@@ -83,14 +84,73 @@ const runBatch = async (action, size, x, y, signal, onWait) => {
   }
   await wait(KEY_DELAY_MS, signal);
   await confirmBuild("buildMaxxing", { signal, onWait });
-  await wait(BUILD_DELAY_MS, signal);
 };
 
 export const batchAffordable = (state, action, size) =>
   state.batchCost !== null &&
   state.batchCost !== undefined &&
   BigInt(state.gold) >= BigInt(state.batchCost) &&
-  (action !== "buildAtomBomb" || state.readyMissiles >= size);
+  (!BUILDABLES[action].usesMissile || state.readyMissiles >= size);
+
+export const confirmedBatchAmount = (before, after, action) => {
+  const beforeUnits = Array.isArray(before.units) ? before.units : [];
+  const afterUnits = Array.isArray(after.units) ? after.units : [];
+  if (before.targetUnitId !== null && before.targetUnitId !== undefined) {
+    const previous = beforeUnits.find(({ id }) => id === before.targetUnitId);
+    const current = afterUnits.find(({ id }) => id === before.targetUnitId);
+    if (!previous || !current) return 0;
+    return Math.max(0, current.level - previous.level);
+  }
+
+  const previousIds = new Set(beforeUnits.map(({ id }) => id));
+  const created = afterUnits.filter(({ id }) => !previousIds.has(id)).length;
+  if (!BUILDABLES[action].usesMissile) return created;
+  const missilesUsed =
+    typeof before.readyMissiles === "number" &&
+    typeof after.readyMissiles === "number"
+      ? Math.max(0, before.readyMissiles - after.readyMissiles)
+      : 0;
+  return Math.max(created, missilesUsed);
+};
+
+const confirmBatch = async (point, action, size, before, signal) => {
+  const deadline = Date.now() + CONFIRM_TIMEOUT_MS;
+  let confirmed = 0;
+  while (!signal.aborted) {
+    const after = await inspect(point.x, point.y, action, size);
+    if (signal.aborted) throw signal.reason;
+    if (after.ready) {
+      confirmed = Math.max(
+        confirmed,
+        confirmedBatchAmount(before, after, action),
+      );
+      if (confirmed >= size) return { confirmed: size };
+
+      if (
+        before.targetUnitId !== null &&
+        before.targetUnitId !== undefined &&
+        Array.isArray(after.units) &&
+        !after.units.some(({ id }) => id === before.targetUnitId)
+      ) {
+        return { confirmed, blocked: "target changed" };
+      }
+      if (after.valid === false) {
+        return { confirmed, blocked: "target changed" };
+      }
+    }
+    if (Date.now() >= deadline) {
+      return {
+        confirmed,
+        blocked:
+          confirmed > 0
+            ? `only ${confirmed}/${size} confirmed`
+            : "batch not confirmed",
+      };
+    }
+    await wait(CONFIRM_INTERVAL_MS, signal);
+  }
+  return { confirmed, blocked: "cancelled" };
+};
 
 // A structure cannot be upgraded while it is still under construction, and gold
 // may not have caught up yet, so wait for the game to say the next batch is
@@ -105,7 +165,7 @@ const waitUntilAffordable = async (point, action, size, signal) => {
       if (state.batchCost === null || state.batchCost === undefined) {
         return { blocked: "price unavailable" };
       }
-      if (batchAffordable(state, action, size)) return {};
+      if (batchAffordable(state, action, size)) return { state };
       if (Date.now() > deadline) {
         return {
           blocked:
@@ -311,7 +371,7 @@ const start = async (body) => {
       let done = 0;
       for (const size of batches) {
         if (signal.aborted) break;
-        const { blocked } = await waitUntilAffordable(
+        const { state, blocked } = await waitUntilAffordable(
           point,
           action,
           size,
@@ -321,10 +381,16 @@ const start = async (body) => {
           status.textContent = `Stopped at ${done}: ${blocked}`;
           break;
         }
-        await runBatch(action, size, point.x, point.y, signal, () => {
+        await runBatch(action, size, signal, () => {
           status.textContent = `${done}/${count} — pacing`;
         });
-        done += size;
+        status.textContent = `${done}/${count} — confirming`;
+        const result = await confirmBatch(point, action, size, state, signal);
+        done += result.confirmed;
+        if (result.blocked) {
+          status.textContent = `Stopped at ${done}: ${result.blocked}`;
+          break;
+        }
         status.textContent = `${done}/${count}`;
       }
       if (done >= count) status.textContent = "Done";
