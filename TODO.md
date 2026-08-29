@@ -72,3 +72,10 @@ Example: you hold a dense cluster of structures behind a level 5 SAM, and there
 is a player in the game with at least 6 missile silos, so they can punch through
 it — medium warning. If that player then gets close to the gold needed to fire
 enough bombs, the danger level rises.
+
+## Build presets
+
+A catalogue of building layouts. Each entry shows a picture of the arrangement
+and its price — a small block of cities and factories, for instance. Click one
+and, if there is enough room, it builds the structures according to that preset.
+Presets you cannot currently afford appear disabled.
