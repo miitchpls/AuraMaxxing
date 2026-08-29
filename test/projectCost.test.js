@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
-import { projectCost } from "../src/api/game.js";
+import { projectCost, projectStartingCost } from "../src/api/game.js";
 
 const CITY_BASE = 125000n;
 assert.equal(projectCost("City", CITY_BASE, 1), 125000n);
 assert.equal(projectCost("City", CITY_BASE, 2), 375000n);
 assert.equal(projectCost("City", CITY_BASE, 3), 875000n);
 assert.equal(projectCost("City", CITY_BASE, 10), 7875000n);
+assert.equal(projectStartingCost("buildCity", 1), 125000n);
+assert.equal(projectStartingCost("buildCity", 10), 7875000n);
+assert.equal(projectStartingCost("buildMissileSilo", 1), 1000000n);
 
 assert.equal(projectCost("Warship", 250000n, 3), 1500000n);
 // 250k + 500k + 750k, then the 1M cap holds for the rest.

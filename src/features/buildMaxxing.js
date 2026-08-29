@@ -6,7 +6,13 @@ import {
   pressEscape,
   releasePointer,
 } from "../api/input.js";
-import { inspect, inspectWorld, projectWorld, quote } from "../api/game.js";
+import {
+  inspect,
+  inspectWorld,
+  projectStartingCost,
+  projectWorld,
+  quote,
+} from "../api/game.js";
 import { confirmBuild } from "../api/intents.js";
 import { addSection } from "../ui/panel.js";
 
@@ -304,6 +310,10 @@ const showCost = async (body) => {
     return;
   }
 
+  label.textContent = formatGold(projectStartingCost(action, count));
+  label.classList.remove("text-red-400");
+  label.classList.add("text-slate-400");
+
   const price = await quote(action, count);
 
   // A run in progress owns the button; it reads Cancel and must stay clickable.
@@ -315,7 +325,6 @@ const showCost = async (body) => {
   }
 
   if (!price.ready) {
-    label.textContent = "";
     button.disabled = false;
     return;
   }

@@ -74,6 +74,18 @@ const STEPPING = new Map([
   ["Warship", { step: 250000n, cap: 1000000n }],
   ["MIRV", { step: 15000000n }],
 ]);
+const STARTING_COST = new Map([
+  ["City", 125000n],
+  ["Factory", 125000n],
+  ["Port", 125000n],
+  ["Defense Post", 50000n],
+  ["Missile Silo", 1000000n],
+  ["SAM Launcher", 1500000n],
+  ["Warship", 250000n],
+  ["Atom Bomb", 750000n],
+  ["Hydrogen Bomb", 5000000n],
+  ["MIRV", 25000000n],
+]);
 
 export const projectCost = (unitType, base, count) => {
   let price = base;
@@ -94,6 +106,13 @@ export const projectCost = (unitType, base, count) => {
     }
   }
   return total;
+};
+
+// Keeps the pre-game panel useful while no player exists for a live quote.
+// Once a match is running, quote() replaces this baseline with current prices.
+export const projectStartingCost = (action, count) => {
+  const unitType = BUILDABLES[action].unitType;
+  return projectCost(unitType, STARTING_COST.get(unitType), count);
 };
 
 export const quote = async (action, count) => {
