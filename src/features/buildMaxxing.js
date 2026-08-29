@@ -7,7 +7,7 @@ import {
   pressEscape,
   releasePointer,
 } from "../api/input.js";
-import { inspect } from "../api/game.js";
+import { inspect, quote } from "../api/game.js";
 import { addSection } from "../ui/panel.js";
 
 const LABELS = {
@@ -151,8 +151,28 @@ const buildBody = () => {
     <button class="w-full px-1 py-1 cursor-pointer bg-gray-700/50 hover:bg-gray-600 border border-slate-500 rounded-md transition-colors" data-run>
       Activate
     </button>
+    <span class="text-xs text-slate-400" data-cost></span>
     <span class="text-xs text-slate-400" data-status>Idle</span>`;
   return body;
+};
+
+const formatGold = (amount) => {
+  if (amount >= 1_000_000n) return `${Number(amount) / 1_000_000}M`;
+  if (amount >= 1_000n) return `${Number(amount) / 1_000}K`;
+  return `${amount}`;
+};
+
+const showCost = async (body) => {
+  const label = body.querySelector("[data-cost]");
+  const action = body.querySelector("[data-entity]").value;
+  const count = Math.max(1, Number(body.querySelector("[data-count]").value));
+  const price = await quote(action, count);
+  if (!price.ready) {
+    label.textContent = "";
+    return;
+  }
+  const total = formatGold(BigInt(price.total));
+  label.textContent = price.exact ? `Cost: ${total}` : `Cost: ~${total}`;
 };
 
 let removeSection = null;
@@ -218,6 +238,10 @@ export default {
 
   enable() {
     const body = buildBody();
+    for (const field of ["[data-entity]", "[data-count]"]) {
+      body.querySelector(field).addEventListener("change", () => showCost(body));
+    }
+    showCost(body);
     body.querySelector("[data-run]").addEventListener("click", () => {
       if (abort) {
         abort.abort();

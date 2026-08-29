@@ -24,12 +24,13 @@ let lastId = 0;
 export const available = () =>
   document.documentElement.dataset.auramaxxingBridge === "1";
 
-export const inspect = (x, y, action) =>
+const ask = (payload) =>
   new Promise((resolve) => {
     const id = ++lastId;
+    const kind = payload.kind ?? "inspect";
     const onResponse = (event) => {
       const data = JSON.parse(event.detail);
-      if (data.id !== id) return;
+      if (data.id !== id || data.kind !== kind) return;
       done(data);
     };
     const timer = setTimeout(() => done({ ready: false }), TIMEOUT_MS);
@@ -40,13 +41,41 @@ export const inspect = (x, y, action) =>
     };
     window.addEventListener(RESPONSE, onResponse);
     window.dispatchEvent(
-      new CustomEvent(REQUEST, {
-        detail: JSON.stringify({
-          id,
-          screenX: x,
-          screenY: y,
-          unitType: UNIT_TYPES[action],
-        }),
-      }),
+      new CustomEvent(REQUEST, { detail: JSON.stringify({ id, ...payload }) }),
     );
   });
+
+export const inspect = (x, y, action) =>
+  ask({ kind: "inspect", screenX: x, screenY: y, unitType: UNIT_TYPES[action] });
+
+// The game caps only the types whose price escalates: cities, factories and
+// ports double per unit, warships step by a fixed amount, everything else is
+// flat. Used when the player owns none of a type, so the game has no running
+// totals to give and only the next price is known.
+const PRICE_CAP = 1000000n;
+const DOUBLING = new Set(["City", "Factory", "Port"]);
+const STEPPING = new Map([["Warship", 250000n]]);
+
+export const projectCost = (unitType, base, count) => {
+  const capped = (next) => (next > PRICE_CAP ? PRICE_CAP : next);
+  let price = base;
+  let total = 0n;
+  for (let i = 0; i < count; i++) {
+    total += price;
+    if (DOUBLING.has(unitType)) price = capped(price * 2n);
+    else if (STEPPING.has(unitType)) price = capped(price + STEPPING.get(unitType));
+  }
+  return total;
+};
+
+export const quote = async (action, count) => {
+  const unitType = UNIT_TYPES[action];
+  const reply = await ask({ kind: "quote", unitType, count });
+  if (!reply.ready) return reply;
+  return {
+    ...reply,
+    total: reply.exact
+      ? reply.total
+      : String(projectCost(unitType, BigInt(reply.base), count)),
+  };
+};
