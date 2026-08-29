@@ -275,8 +275,10 @@ const buildBody = () => {
     <button class="w-full px-1 py-1 cursor-pointer bg-gray-700/50 hover:bg-gray-600 border border-slate-500 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed" data-run>
       Activate
     </button>
-    <span class="text-xs text-slate-400" data-cost></span>
-    <span class="text-xs text-slate-400" data-status>Idle</span>`;
+    <div class="flex items-center justify-between gap-2 text-xs">
+      <span class="text-slate-400" data-status>Idle</span>
+      <span class="text-slate-400" data-cost></span>
+    </div>`;
   return body;
 };
 
@@ -288,15 +290,16 @@ const formatGold = (amount) => {
 
 const showCost = async (body) => {
   const label = body.querySelector("[data-cost]");
+  const status = body.querySelector("[data-status]");
   const button = body.querySelector("[data-run]");
   const action = body.querySelector("[data-entity]").value;
   const count = parseCount(body.querySelector("[data-count]").value);
 
   if (activeRun !== null) return;
   if (count === null) {
-    label.textContent = "Count must be a whole number of at least 1";
-    label.classList.add("text-red-400");
-    label.classList.remove("text-slate-400");
+    label.textContent = "";
+    status.textContent = "Count must be a whole number of at least 1";
+    status.dataset.costError = "true";
     button.disabled = true;
     return;
   }
@@ -305,6 +308,11 @@ const showCost = async (body) => {
 
   // A run in progress owns the button; it reads Cancel and must stay clickable.
   if (activeRun !== null) return;
+
+  if (status.dataset.costError === "true") {
+    status.textContent = "Idle";
+    delete status.dataset.costError;
+  }
 
   if (!price.ready) {
     label.textContent = "";
@@ -315,9 +323,7 @@ const showCost = async (body) => {
   const total = BigInt(price.total);
   const affordable = BigInt(price.gold) >= total;
   const shown = `${price.exact ? "" : "~"}${formatGold(total)}`;
-  label.textContent = affordable
-    ? `Cost: ${shown}`
-    : `Cost: ${shown} — you have ${formatGold(BigInt(price.gold))}`;
+  label.textContent = shown;
   label.classList.toggle("text-red-400", !affordable);
   label.classList.toggle("text-slate-400", affordable);
   button.disabled = !affordable;
@@ -330,7 +336,10 @@ let activeRun = null;
 const refreshCost = (body) => {
   showCost(body).catch(() => {
     if (activeRun !== null) return;
-    body.querySelector("[data-cost]").textContent = "Cost unavailable";
+    body.querySelector("[data-cost]").textContent = "";
+    const status = body.querySelector("[data-status]");
+    status.textContent = "Cost unavailable";
+    status.dataset.costError = "true";
     body.querySelector("[data-run]").disabled = false;
   });
 };
@@ -361,6 +370,7 @@ const start = async (body) => {
   const signal = run.controller.signal;
   activeRun = run;
   button.textContent = "Cancel";
+  body.querySelector("[data-cost]").textContent = "";
   status.textContent = "Click the target tile";
 
   let cursor = null;
