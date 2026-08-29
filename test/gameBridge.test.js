@@ -18,12 +18,67 @@ let ownedUnits = [];
 let screenWorld = { x: 1, y: 1 };
 let projectOffset = 0;
 let lastRef = null;
+let allianceInteraction = { canSendAllianceRequest: true };
+let allianceInteractionCalls = 0;
+const emitted = [];
+class SendAllianceRequestIntentEvent {
+  constructor(requestor, recipient) {
+    this.requestor = requestor;
+    this.recipient = recipient;
+  }
+}
+class SendAllianceExtensionIntentEvent {
+  constructor(recipient) {
+    this.recipient = recipient;
+  }
+}
+const eventBus = {
+  listeners: new Map([
+    [SendAllianceRequestIntentEvent, [function onSendAllianceRequest() {}]],
+    [
+      SendAllianceExtensionIntentEvent,
+      [function onSendAllianceExtensionIntent() {}],
+    ],
+  ]),
+  emit: (event) => emitted.push(event),
+};
+const other = {
+  id: () => "other-player",
+  type: () => "HUMAN",
+  isAlive: () => true,
+  isDisconnected: () => false,
+  nameLocation: () => ({ x: 2, y: 2 }),
+};
+const bot = {
+  id: () => "bot-player",
+  type: () => "BOT",
+  isAlive: () => true,
+  isDisconnected: () => false,
+  nameLocation: () => ({ x: 3, y: 3 }),
+};
+const nation = {
+  id: () => "nation-player",
+  type: () => "NATION",
+  isAlive: () => true,
+  isDisconnected: () => false,
+  nameLocation: () => ({ x: 4, y: 4 }),
+};
 const player = {
   buildables: async () => buildables,
   units: () => ownedUnits,
   gold: () => 4000000n,
   readyMissileCount: () => 4,
   troops: () => 60000,
+  id: () => "my-player",
+  isAlive: () => true,
+  isFriendly: () => false,
+  isRequestingAllianceWith: () => false,
+  isAlliedWith: () => false,
+  alliances: () => [],
+  actions: async () => {
+    allianceInteractionCalls++;
+    return { interaction: allianceInteraction };
+  },
 };
 let activePlayer = player;
 const game = {
@@ -32,11 +87,14 @@ const game = {
     maxTroops: () => 100000,
     troopIncreaseRate: () => 321.5,
   }),
+  players: () => [player, other, bot, nation],
   isValidCoord: () => true,
   ref: (x, y) => {
     lastRef = { x, y };
-    return {};
+    return { x, y };
   },
+  owner: ({ x, y }) =>
+    x === 2 && y === 2 ? other : x === 4 && y === 4 ? nation : player,
 };
 const transformHandler = {
   screenToWorldCoordinates: () => screenWorld,
@@ -49,6 +107,7 @@ globalThis.document = {
   documentElement: { dataset: {} },
   querySelector: () => ({
     game,
+    eventBus,
     transformHandler,
   }),
 };
@@ -156,9 +215,72 @@ const atomBombs = await inspect("Atom Bomb", 5, true);
 assert.equal(atomBombs.batchCost, "3750000");
 assert.equal(atomBombs.readyMissiles, 4);
 
+assert.deepEqual(await request({ kind: "allianceState" }), {
+  kind: "allianceState",
+  id: 7,
+  ready: true,
+  actions: [
+    { type: "request", recipient: "other-player" },
+    { type: "request", recipient: "nation-player" },
+  ],
+});
+assert.equal(allianceInteractionCalls, 2);
+
+assert.deepEqual(
+  await request({
+    kind: "allianceAction",
+    action: "request",
+    recipient: "other-player",
+    token: "request-action",
+  }),
+  { kind: "allianceAction", id: 8, ready: true, sent: true },
+);
+assert.equal(emitted[0] instanceof SendAllianceRequestIntentEvent, true);
+assert.equal(emitted[0].recipient, other);
+
+allianceInteraction = {
+  canSendAllianceRequest: false,
+  allianceInfo: { canExtend: true },
+};
+assert.deepEqual(
+  await request({
+    kind: "allianceAction",
+    action: "extension",
+    recipient: "other-player",
+    token: "extension-action",
+  }),
+  { kind: "allianceAction", id: 9, ready: true, sent: true },
+);
+assert.equal(emitted[1] instanceof SendAllianceExtensionIntentEvent, true);
+assert.equal(emitted[1].recipient, other);
+
+let finishInteraction;
+player.actions = () =>
+  new Promise((resolve) => {
+    finishInteraction = resolve;
+  });
+const cancelledAction = request({
+  kind: "allianceAction",
+  action: "extension",
+  recipient: "other-player",
+  token: "cancel-me",
+});
+assert.deepEqual(
+  await request({ kind: "allianceCancel", token: "cancel-me" }),
+  { kind: "allianceCancel", id: 11, ready: true },
+);
+finishInteraction({ interaction: allianceInteraction });
+assert.deepEqual(await cancelledAction, {
+  kind: "allianceAction",
+  id: 10,
+  ready: true,
+  sent: false,
+});
+assert.equal(emitted.length, 2);
+
 assert.deepEqual(await request({ kind: "troops" }), {
   kind: "troops",
-  id: 7,
+  id: 12,
   ready: true,
   troops: 60000,
   maxTroops: 100000,
@@ -167,7 +289,7 @@ assert.deepEqual(await request({ kind: "troops" }), {
 activePlayer = null;
 assert.deepEqual(await request({ kind: "troops" }), {
   kind: "troops",
-  id: 8,
+  id: 13,
   ready: false,
 });
 

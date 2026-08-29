@@ -15,6 +15,7 @@ const TIMEOUT_MS = 2000;
 // reply. The prefix makes each client's ids its own.
 const CLIENT = Math.random().toString(36).slice(2, 10);
 let lastId = 0;
+let lastAllianceToken = 0;
 
 export const available = () =>
   document.documentElement.dataset.auramaxxingBridge === "1";
@@ -166,3 +167,17 @@ export const peakTroopPlan = (troops, maxTroops) => {
 };
 
 export const troopState = () => ask({ kind: "troops" });
+
+export const allianceActions = () => ask({ kind: "allianceState" });
+
+export const sendAllianceAction = (action, recipient, { signal } = {}) => {
+  if (signal?.aborted) return Promise.reject(signal.reason);
+  const token = `${CLIENT}-alliance-${++lastAllianceToken}`;
+  const onAbort = () => {
+    void ask({ kind: "allianceCancel", token });
+  };
+  signal?.addEventListener("abort", onAbort, { once: true });
+  return ask({ kind: "allianceAction", action, recipient, token }).finally(() =>
+    signal?.removeEventListener("abort", onAbort),
+  );
+};
