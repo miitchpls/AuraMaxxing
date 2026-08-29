@@ -126,3 +126,44 @@ export const quote = async (action, count) => {
       : String(projectCost(unitType, BigInt(reply.base), count)),
   };
 };
+
+const TROOP_EXPONENT = 0.73;
+const TROOP_CURVE_ITERATIONS = 80;
+
+export const troopIncreaseRateAt = (troops, maxTroops) => {
+  const increase =
+    (10 + Math.pow(troops, TROOP_EXPONENT) / 4) * (1 - troops / maxTroops);
+  return Math.min(troops + increase, maxTroops) - troops;
+};
+
+export const peakTroopTarget = (maxTroops) => {
+  if (!Number.isFinite(maxTroops) || maxTroops <= 0) return null;
+
+  let belowPeak = 0;
+  let abovePeak = maxTroops;
+  for (let i = 0; i < TROOP_CURVE_ITERATIONS; i++) {
+    const troops = (belowPeak + abovePeak) / 2;
+    const slope =
+      (TROOP_EXPONENT / 4) *
+        Math.pow(troops, TROOP_EXPONENT - 1) *
+        (1 - troops / maxTroops) -
+      (10 + Math.pow(troops, TROOP_EXPONENT) / 4) / maxTroops;
+    if (slope > 0) belowPeak = troops;
+    else abovePeak = troops;
+  }
+  return (belowPeak + abovePeak) / 2;
+};
+
+export const peakTroopPlan = (troops, maxTroops) => {
+  if (!Number.isFinite(troops) || troops < 0) return null;
+  const targetTroops = peakTroopTarget(maxTroops);
+  if (targetTroops === null) return null;
+  const surplusRatio = troops > 0 ? (troops - targetTroops) / troops : 0;
+  return {
+    targetTroops,
+    targetRatio: targetTroops / maxTroops,
+    attackPercent: Math.max(0, Math.floor(surplusRatio * 100)),
+  };
+};
+
+export const troopState = () => ask({ kind: "troops" });

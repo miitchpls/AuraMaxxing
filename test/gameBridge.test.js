@@ -23,9 +23,15 @@ const player = {
   units: () => ownedUnits,
   gold: () => 4000000n,
   readyMissileCount: () => 4,
+  troops: () => 60000,
 };
+let activePlayer = player;
 const game = {
-  myPlayer: () => player,
+  myPlayer: () => activePlayer,
+  config: () => ({
+    maxTroops: () => 100000,
+    troopIncreaseRate: () => 321.5,
+  }),
   isValidCoord: () => true,
   ref: (x, y) => {
     lastRef = { x, y };
@@ -149,5 +155,20 @@ ownedUnits = [];
 const atomBombs = await inspect("Atom Bomb", 5, true);
 assert.equal(atomBombs.batchCost, "3750000");
 assert.equal(atomBombs.readyMissiles, 4);
+
+assert.deepEqual(await request({ kind: "troops" }), {
+  kind: "troops",
+  id: 7,
+  ready: true,
+  troops: 60000,
+  maxTroops: 100000,
+  increasePerSecond: 3215,
+});
+activePlayer = null;
+assert.deepEqual(await request({ kind: "troops" }), {
+  kind: "troops",
+  id: 8,
+  ready: false,
+});
 
 console.log("gameBridge ok");

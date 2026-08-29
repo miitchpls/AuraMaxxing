@@ -115,11 +115,41 @@ const quote = async ({ id, unitType, count }) => {
   });
 };
 
+const troops = async ({ id }) => {
+  const element = document.querySelector("build-menu");
+  const game = element?.game;
+  const player = game?.myPlayer?.();
+  const config = game?.config?.();
+  if (!player || !config) return reply({ kind: "troops", id, ready: false });
+
+  const current = player.troops();
+  const max = config.maxTroops(player);
+  const increasePerSecond = config.troopIncreaseRate(player) * 10;
+  if (![current, max, increasePerSecond].every(Number.isFinite) || max <= 0) {
+    return reply({ kind: "troops", id, ready: false });
+  }
+
+  reply({
+    kind: "troops",
+    id,
+    ready: true,
+    troops: current,
+    maxTroops: max,
+    increasePerSecond,
+  });
+};
+
 window.addEventListener(REQUEST, (event) => {
   const request = JSON.parse(event.detail);
   const kind = request.kind ?? "inspect";
   const handler =
-    kind === "quote" ? quote : kind === "project" ? project : inspect;
+    kind === "quote"
+      ? quote
+      : kind === "project"
+        ? project
+        : kind === "troops"
+          ? troops
+          : inspect;
   handler(request).catch(() => reply({ kind, id: request.id, ready: false }));
 });
 
