@@ -1,5 +1,5 @@
+import { BUILDABLES, BUILD_ACTIONS } from "../api/buildables.js";
 import {
-  BUILD_ACTIONS,
   DRAG_THRESHOLD_PX,
   pinCursor,
   pressBuildKey,
@@ -23,18 +23,6 @@ const LABELS = {
   buildMIRV: "MIRV",
 };
 
-// Pressing a build key twice sets the game's x5 multiplier, which batches five
-// actions into one intent and so hits the server rate limit five times less
-// often. The game only honours it on the upgrade path (upgradable structures)
-// and, when building, for the atom bomb alone — everywhere else it is ignored.
-const BATCHABLE_ON_UPGRADE = new Set([
-  "buildCity",
-  "buildFactory",
-  "buildPort",
-  "buildMissileSilo",
-  "buildSamLauncher",
-]);
-const BATCHABLE_ON_BUILD = new Set(["buildAtomBomb"]);
 const BATCH_SIZE = 5;
 
 const KEY_DELAY_MS = 100;
@@ -75,8 +63,9 @@ const chunk = (count) => [
 ];
 
 export const planBatches = (action, count, firstIsBuild) => {
-  if (BATCHABLE_ON_BUILD.has(action)) return chunk(count);
-  if (!BATCHABLE_ON_UPGRADE.has(action)) return Array(count).fill(1);
+  const { batching } = BUILDABLES[action];
+  if (batching === "build") return chunk(count);
+  if (batching !== "upgrade") return Array(count).fill(1);
   // A build ignores the multiplier, so only the upgrades that follow batch.
   return firstIsBuild ? [1, ...chunk(count - 1)] : chunk(count);
 };

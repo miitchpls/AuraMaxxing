@@ -1,19 +1,5 @@
+import { BUILDABLES } from "./buildables.js";
 import { available as settingsAvailable, keybinds } from "./settings.js";
-
-const DEFAULT_BINDINGS = {
-  buildCity: "Digit1",
-  buildFactory: "Digit2",
-  buildPort: "Digit3",
-  buildDefensePost: "Digit4",
-  buildMissileSilo: "Digit5",
-  buildSamLauncher: "Digit6",
-  buildWarship: "Digit7",
-  buildAtomBomb: "Digit8",
-  buildHydrogenBomb: "Digit9",
-  buildMIRV: "Digit0",
-};
-
-export const BUILD_ACTIONS = Object.keys(DEFAULT_BINDINGS);
 
 export const available = () => settingsAvailable();
 
@@ -22,7 +8,7 @@ const binding = (action) => {
   const value = stored?.value ?? (Array.isArray(stored) ? stored[0] : stored);
   if (value === "Null") return undefined;
   if (typeof value === "string") return value;
-  return DEFAULT_BINDINGS[action];
+  return BUILDABLES[action]?.key;
 };
 
 const sendKey = (type, code, shiftKey) =>

@@ -2,22 +2,12 @@
 // so this talks to src/world/gameBridge.js running in the page world. It is the
 // only part of the extension that depends on the game's internals, and the only
 // one expected to break when the game changes.
+import { BUILDABLES } from "./buildables.js";
+
 const REQUEST = "auramaxxing:game-request";
 const RESPONSE = "auramaxxing:game-response";
 const TIMEOUT_MS = 2000;
 
-const UNIT_TYPES = {
-  buildCity: "City",
-  buildFactory: "Factory",
-  buildPort: "Port",
-  buildDefensePost: "Defense Post",
-  buildMissileSilo: "Missile Silo",
-  buildSamLauncher: "SAM Launcher",
-  buildWarship: "Warship",
-  buildAtomBomb: "Atom Bomb",
-  buildHydrogenBomb: "Hydrogen Bomb",
-  buildMIRV: "MIRV",
-};
 
 // The testing flow in AGENTS.md runs two clients at once — the installed
 // extension and a copy loaded from the dev server — and the bridge echoes ids
@@ -55,7 +45,7 @@ export const inspect = (x, y, action, count = 1) =>
     kind: "inspect",
     screenX: x,
     screenY: y,
-    unitType: UNIT_TYPES[action],
+    unitType: BUILDABLES[action].unitType,
     count,
   });
 
@@ -93,7 +83,7 @@ export const projectCost = (unitType, base, count) => {
 };
 
 export const quote = async (action, count) => {
-  const unitType = UNIT_TYPES[action];
+  const unitType = BUILDABLES[action].unitType;
   const reply = await ask({ kind: "quote", unitType, count });
   if (!reply.ready) return reply;
   return {
