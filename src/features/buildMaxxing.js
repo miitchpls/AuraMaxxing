@@ -40,6 +40,9 @@ const BATCH_SIZE = 5;
 const KEY_DELAY_MS = 100;
 const BUILD_DELAY_MS = 300;
 const POLL_INTERVAL_MS = 500;
+// Gold accrues while the panel sits idle, so the price and the button's enabled
+// state are refreshed on a slow timer rather than only when a field changes.
+const COST_REFRESH_MS = 2000;
 const POLL_TIMEOUT_MS = 60000;
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -148,7 +151,7 @@ const buildBody = () => {
     </select>
     <input type="number" min="1" value="10"
       class="w-full px-1 py-1 bg-gray-700/50 border border-slate-500 rounded-md text-white" data-count />
-    <button class="w-full px-1 py-1 cursor-pointer bg-gray-700/50 hover:bg-gray-600 border border-slate-500 rounded-md transition-colors" data-run>
+    <button class="w-full px-1 py-1 cursor-pointer bg-gray-700/50 hover:bg-gray-600 border border-slate-500 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed" data-run>
       Activate
     </button>
     <span class="text-xs text-slate-400" data-cost></span>
@@ -164,18 +167,33 @@ const formatGold = (amount) => {
 
 const showCost = async (body) => {
   const label = body.querySelector("[data-cost]");
+  const button = body.querySelector("[data-run]");
   const action = body.querySelector("[data-entity]").value;
   const count = Math.max(1, Number(body.querySelector("[data-count]").value));
   const price = await quote(action, count);
+
+  // A run in progress owns the button; it reads Cancel and must stay clickable.
+  if (abort !== null) return;
+
   if (!price.ready) {
     label.textContent = "";
+    button.disabled = false;
     return;
   }
-  const total = formatGold(BigInt(price.total));
-  label.textContent = price.exact ? `Cost: ${total}` : `Cost: ~${total}`;
+
+  const total = BigInt(price.total);
+  const affordable = BigInt(price.gold) >= total;
+  const shown = `${price.exact ? "" : "~"}${formatGold(total)}`;
+  label.textContent = affordable
+    ? `Cost: ${shown}`
+    : `Cost: ${shown} — you have ${formatGold(BigInt(price.gold))}`;
+  label.classList.toggle("text-red-400", !affordable);
+  label.classList.toggle("text-slate-400", affordable);
+  button.disabled = !affordable;
 };
 
 let removeSection = null;
+let costTimer = null;
 let abort = null;
 
 const start = async (body) => {
@@ -229,6 +247,7 @@ const start = async (body) => {
 
   button.textContent = "Activate";
   abort = null;
+  showCost(body);
 };
 
 export default {
@@ -242,6 +261,7 @@ export default {
       body.querySelector(field).addEventListener("change", () => showCost(body));
     }
     showCost(body);
+    costTimer = setInterval(() => showCost(body), COST_REFRESH_MS);
     body.querySelector("[data-run]").addEventListener("click", () => {
       if (abort) {
         abort.abort();
@@ -258,6 +278,8 @@ export default {
   disable() {
     abort?.abort();
     abort = null;
+    clearInterval(costTimer);
+    costTimer = null;
     removeSection?.();
     removeSection = null;
   },
