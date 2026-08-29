@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { BUILD_ACTIONS } from "../src/api/buildables.js";
 import {
   batchAffordable,
   confirmedBatchAmount,
@@ -7,6 +8,8 @@ import {
 } from "../src/features/buildMaxxing.js";
 
 const total = (batches) => batches.reduce((sum, size) => sum + size, 0);
+
+assert.equal(BUILD_ACTIONS.includes("buildDefensePost"), false);
 
 assert.deepEqual(planBatches("buildWarship", 12, true), Array(12).fill(1));
 assert.deepEqual(planBatches("buildCity", 12, true), [1, 5, 5, 1]);

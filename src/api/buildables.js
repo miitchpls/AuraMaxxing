@@ -6,11 +6,6 @@ export const BUILDABLES = {
   buildCity: { key: "Digit1", unitType: "City", batching: "upgrade" },
   buildFactory: { key: "Digit2", unitType: "Factory", batching: "upgrade" },
   buildPort: { key: "Digit3", unitType: "Port", batching: "upgrade" },
-  buildDefensePost: {
-    key: "Digit4",
-    unitType: "Defense Post",
-    batching: "none",
-  },
   buildMissileSilo: {
     key: "Digit5",
     unitType: "Missile Silo",

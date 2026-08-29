@@ -14,7 +14,6 @@ const LABELS = {
   buildCity: "City",
   buildFactory: "Factory",
   buildPort: "Port",
-  buildDefensePost: "Defense post",
   buildMissileSilo: "Missile silo",
   buildSamLauncher: "SAM launcher",
   buildWarship: "Warship",

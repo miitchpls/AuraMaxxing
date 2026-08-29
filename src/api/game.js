@@ -69,7 +69,6 @@ const DOUBLING = new Map([
   ["Port", 1000000n],
 ]);
 const STEPPING = new Map([
-  ["Defense Post", { step: 50000n, cap: 250000n }],
   ["SAM Launcher", { step: 1500000n, cap: 3000000n }],
   ["Warship", { step: 250000n, cap: 1000000n }],
   ["MIRV", { step: 15000000n }],
