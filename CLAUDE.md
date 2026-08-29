@@ -82,6 +82,18 @@ settable as properties on the `single-player-modal` element before starting:
   exactly like a broken feature.
 - `instantBuild = true` when the test is about issuing builds, not waiting.
 
+Load the extension code by importing the live modules from the dev server —
+`await import("/AuraMaxxing/src/main.js")` — instead of the installed extension.
+This folder sits inside the root Vite serves, so that always runs what is on
+disk, with no reload step. Chrome forbids extensions from touching
+`chrome://` pages, so reloading the installed extension is something only a
+human can do, and a half-reloaded extension silently mixes old and new modules.
+What this path does not exercise is the isolated/page world split, so a change
+to `src/world/gameBridge.js` still needs a real extension reload to trust.
+
+Always read the page console after a test run. A module that fails to load, or a
+feature that threw on enable, shows up there and nowhere else.
+
 ## Performance — non-negotiable
 
 The game already saturates the GPU. The extension does no per-frame work.
