@@ -6,7 +6,7 @@ import {
   pressEscape,
   releasePointer,
 } from "../api/input.js";
-import { inspect, quote } from "../api/game.js";
+import { inspect, inspectWorld, projectWorld, quote } from "../api/game.js";
 import { confirmBuild } from "../api/intents.js";
 import { addSection } from "../ui/panel.js";
 
@@ -73,16 +73,25 @@ export const planBatches = (action, count, firstIsBuild) => {
 
 // Only the confirm reaches the server; the key presses stay in the client. So
 // the batch queues at the tunnel once, right at the end, never as a whole.
-const runBatch = async (action, size, signal, onWait) => {
+const aimAt = async (point, cursor, signal) => {
+  const screen = await projectWorld(point.x, point.y);
+  if (signal.aborted) throw signal.reason;
+  if (!screen.ready || !screen.valid) throw new Error("Target unavailable");
+  cursor.move(screen.screenX, screen.screenY);
+};
+
+const runBatch = async (action, size, point, cursor, signal, onWait) => {
   if (signal.aborted) throw signal.reason;
   pressEscape();
   await wait(KEY_DELAY_MS, signal);
+  await aimAt(point, cursor, signal);
   if (!pressBuildKey(action)) throw new Error("Build key is unbound");
   if (size === BATCH_SIZE) {
     await wait(KEY_DELAY_MS, signal);
     if (!pressBuildKey(action)) throw new Error("Build key is unbound");
   }
   await wait(KEY_DELAY_MS, signal);
+  await aimAt(point, cursor, signal);
   await confirmBuild("buildMaxxing", { signal, onWait });
 };
 
@@ -117,7 +126,7 @@ const confirmBatch = async (point, action, size, before, signal) => {
   const deadline = Date.now() + CONFIRM_TIMEOUT_MS;
   let confirmed = 0;
   while (!signal.aborted) {
-    const after = await inspect(point.x, point.y, action, size);
+    const after = await inspectWorld(point.x, point.y, action, size);
     if (signal.aborted) throw signal.reason;
     if (after.ready) {
       confirmed = Math.max(
@@ -158,7 +167,7 @@ const confirmBatch = async (point, action, size, before, signal) => {
 const waitUntilAffordable = async (point, action, size, signal) => {
   const deadline = Date.now() + POLL_TIMEOUT_MS;
   while (!signal.aborted) {
-    const state = await inspect(point.x, point.y, action, size);
+    const state = await inspectWorld(point.x, point.y, action, size);
     if (signal.aborted) throw signal.reason;
     if (!state.ready || !state.valid) return { blocked: "game not ready" };
     if (state.canBuild || state.canUpgrade) {
@@ -352,21 +361,29 @@ const start = async (body) => {
   button.textContent = "Cancel";
   status.textContent = "Click the target tile";
 
-  let release = null;
+  let cursor = null;
   try {
-    const point = await captureNextClick(
+    const click = await captureNextClick(
       signal,
       body.closest("#auramaxxing-panel"),
     );
 
-    const target = await inspect(point.x, point.y, action);
+    const target = await inspect(click.x, click.y, action);
     if (signal.aborted) return;
     if (!target.ready) {
       status.textContent = "No game running";
     } else if (!target.valid || (!target.canBuild && !target.canUpgrade)) {
       status.textContent = `Cannot place ${LABELS[action]} there`;
+    } else if (
+      !Number.isInteger(target.worldX) ||
+      !Number.isInteger(target.worldY)
+    ) {
+      status.textContent = "Game bridge out of date";
     } else {
-      release = pinCursor(point.x, point.y);
+      const point = { x: target.worldX, y: target.worldY };
+      const screen = await projectWorld(point.x, point.y);
+      if (!screen.ready || !screen.valid) throw new Error("Target unavailable");
+      cursor = pinCursor(screen.screenX, screen.screenY);
       const batches = planBatches(action, count, !target.canUpgrade);
       let done = 0;
       for (const size of batches) {
@@ -381,7 +398,7 @@ const start = async (body) => {
           status.textContent = `Stopped at ${done}: ${blocked}`;
           break;
         }
-        await runBatch(action, size, signal, () => {
+        await runBatch(action, size, point, cursor, signal, () => {
           status.textContent = `${done}/${count} — pacing`;
         });
         status.textContent = `${done}/${count} — confirming`;
@@ -401,7 +418,7 @@ const start = async (body) => {
       console.error("[AuraMaxxing] buildMaxxing run failed", error);
     }
   } finally {
-    release?.();
+    cursor?.release();
     if (activeRun === run) {
       activeRun = null;
       button.textContent = "Activate";

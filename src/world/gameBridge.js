@@ -13,6 +13,8 @@ const inspect = async ({
   id,
   screenX,
   screenY,
+  worldX,
+  worldY,
   unitType,
   usesMissile = false,
   count = 1,
@@ -25,7 +27,10 @@ const inspect = async ({
     return reply({ kind: "inspect", id, ready: false });
   }
 
-  const world = transform.screenToWorldCoordinates(screenX, screenY);
+  const world =
+    Number.isInteger(worldX) && Number.isInteger(worldY)
+      ? { x: worldX, y: worldY }
+      : transform.screenToWorldCoordinates(screenX, screenY);
   if (!world || !game.isValidCoord(world.x, world.y)) {
     return reply({ kind: "inspect", id, ready: true, valid: false });
   }
@@ -46,6 +51,8 @@ const inspect = async ({
     id,
     ready: true,
     valid: true,
+    worldX: world.x,
+    worldY: world.y,
     canBuild: unit.canBuild !== false,
     canUpgrade: unit.canUpgrade !== false,
     targetUnitId: unit.canUpgrade === false ? null : unit.canUpgrade,
@@ -54,6 +61,30 @@ const inspect = async ({
     batchCost: batchCost === undefined ? null : String(batchCost),
     gold: String(player.gold()),
     readyMissiles: usesMissile ? player.readyMissileCount() : null,
+  });
+};
+
+const project = async ({ id, worldX, worldY }) => {
+  const element = document.querySelector("build-menu");
+  const game = element?.game;
+  const transform = element?.transformHandler;
+  if (!game || !transform) {
+    return reply({ kind: "project", id, ready: false });
+  }
+  if (!game.isValidCoord(worldX, worldY)) {
+    return reply({ kind: "project", id, ready: true, valid: false });
+  }
+  const screen = transform.worldToScreenCoordinates({
+    x: worldX + 0.5,
+    y: worldY + 0.5,
+  });
+  reply({
+    kind: "project",
+    id,
+    ready: true,
+    valid: true,
+    screenX: screen.x,
+    screenY: screen.y,
   });
 };
 
@@ -87,7 +118,8 @@ const quote = async ({ id, unitType, count }) => {
 window.addEventListener(REQUEST, (event) => {
   const request = JSON.parse(event.detail);
   const kind = request.kind ?? "inspect";
-  const handler = kind === "quote" ? quote : inspect;
+  const handler =
+    kind === "quote" ? quote : kind === "project" ? project : inspect;
   handler(request).catch(() => reply({ kind, id: request.id, ready: false }));
 });
 

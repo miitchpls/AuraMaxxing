@@ -47,10 +47,11 @@ export const pressEscape = () => sendKey("keydown", "Escape", false);
 // move is swallowed and replaced by ours, because the game validates the ghost
 // against its last known cursor tile — letting one through retargets the build.
 export const pinCursor = (x, y) => {
+  const point = { x, y };
   let ours = false;
   const send = () => {
     ours = true;
-    moveCursorTo(x, y);
+    moveCursorTo(point.x, point.y);
     ours = false;
   };
   const onRealMove = (event) => {
@@ -60,7 +61,16 @@ export const pinCursor = (x, y) => {
   };
   window.addEventListener("mousemove", onRealMove, true);
   send();
-  return () => window.removeEventListener("mousemove", onRealMove, true);
+  return {
+    move(nextX, nextY) {
+      point.x = nextX;
+      point.y = nextY;
+      send();
+    },
+    release() {
+      window.removeEventListener("mousemove", onRealMove, true);
+    },
+  };
 };
 
 // The game reads a pointerup further than this from the press as a drag and

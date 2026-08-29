@@ -15,6 +15,9 @@ globalThis.window = new EventTarget();
 
 let buildables = [];
 let ownedUnits = [];
+let screenWorld = { x: 1, y: 1 };
+let projectOffset = 0;
+let lastRef = null;
 const player = {
   buildables: async () => buildables,
   units: () => ownedUnits,
@@ -24,22 +27,30 @@ const player = {
 const game = {
   myPlayer: () => player,
   isValidCoord: () => true,
-  ref: () => ({}),
+  ref: (x, y) => {
+    lastRef = { x, y };
+    return {};
+  },
+};
+const transformHandler = {
+  screenToWorldCoordinates: () => screenWorld,
+  worldToScreenCoordinates: ({ x, y }) => ({
+    x: x * 10 + projectOffset,
+    y: y * 10 + projectOffset,
+  }),
 };
 globalThis.document = {
   documentElement: { dataset: {} },
   querySelector: () => ({
     game,
-    transformHandler: {
-      screenToWorldCoordinates: () => ({ x: 1, y: 1 }),
-    },
+    transformHandler,
   }),
 };
 
 await import("../src/world/gameBridge.js");
 
 let nextId = 0;
-const inspect = (unitType, count, usesMissile = false) =>
+const request = (payload) =>
   new Promise((resolve) => {
     const id = ++nextId;
     const onResponse = (event) => {
@@ -52,16 +63,22 @@ const inspect = (unitType, count, usesMissile = false) =>
     window.dispatchEvent(
       new CustomEvent(REQUEST, {
         detail: JSON.stringify({
-          kind: "inspect",
           id,
-          screenX: 10,
-          screenY: 20,
-          unitType,
-          usesMissile,
-          count,
+          ...payload,
         }),
       }),
     );
+  });
+
+const inspect = (unitType, count, usesMissile = false, target = {}) =>
+  request({
+    kind: "inspect",
+    screenX: 10,
+    screenY: 20,
+    unitType,
+    usesMissile,
+    count,
+    ...target,
   });
 
 assert.deepEqual(await inspect("City", 5), {
@@ -86,11 +103,40 @@ const upgrade = await inspect("City", 5);
 assert.equal(upgrade.batchCost, "3500000");
 assert.equal(upgrade.canBuild, false);
 assert.equal(upgrade.canUpgrade, true);
+assert.equal(upgrade.worldX, 1);
+assert.equal(upgrade.worldY, 1);
 assert.equal(upgrade.targetUnitId, 1);
 assert.deepEqual(upgrade.units, [
   { id: 1, level: 4 },
   { id: 2, level: 2 },
 ]);
+
+screenWorld = { x: 9, y: 9 };
+const lockedWorld = await inspect("City", 1, false, {
+  worldX: 1,
+  worldY: 1,
+});
+assert.equal(lockedWorld.worldX, 1);
+assert.equal(lockedWorld.worldY, 1);
+assert.deepEqual(lastRef, { x: 1, y: 1 });
+
+assert.deepEqual(await request({ kind: "project", worldX: 1, worldY: 1 }), {
+  kind: "project",
+  id: 4,
+  ready: true,
+  valid: true,
+  screenX: 15,
+  screenY: 15,
+});
+projectOffset = 100;
+assert.deepEqual(await request({ kind: "project", worldX: 1, worldY: 1 }), {
+  kind: "project",
+  id: 5,
+  ready: true,
+  valid: true,
+  screenX: 115,
+  screenY: 115,
+});
 
 buildables = [
   {

@@ -50,6 +50,19 @@ export const inspect = (x, y, action, count = 1) =>
     count,
   });
 
+export const inspectWorld = (x, y, action, count = 1) =>
+  ask({
+    kind: "inspect",
+    worldX: x,
+    worldY: y,
+    unitType: BUILDABLES[action].unitType,
+    usesMissile: BUILDABLES[action].usesMissile === true,
+    count,
+  });
+
+export const projectWorld = (x, y) =>
+  ask({ kind: "project", worldX: x, worldY: y });
+
 const DOUBLING = new Map([
   ["City", 1000000n],
   ["Factory", 1000000n],
