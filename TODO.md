@@ -16,3 +16,9 @@ and know it is level + 1, but when several SAMs cover the same point their
 ranges overlap and there is no way to see, for that exact spot, how many nukes
 it takes. So it takes the coordinate and reports how many SAMs actually cover it
 and how many bombs are needed to breach.
+
+## WakeMaxxing
+
+Players send sleeping cells: at the start of a game they click somewhere far
+away and land a single troop there, keeping a hidden pocket of territory. This
+warns you when a sleeping cell is sitting near you.
