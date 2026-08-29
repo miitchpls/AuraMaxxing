@@ -61,14 +61,15 @@ undo everything `enable()` did.
 ### API tiers
 
 Tier 1 — stable surface. The DOM, `localStorage`, and synthetic input events.
-These are public surfaces and survive game updates well. Only `api/dom.js`
-exists so far; storage and input modules get written when a feature needs them,
-not before.
+These are public surfaces and survive game updates well. `api/dom.js`,
+`api/settings.js`, `api/input.js`.
 
-Tier 2 — main world. Reading real game state requires injecting into the page
-world and patching minified code; it will break on game deploys. When it is
-needed it goes in a single sacrificial `api/game.js` with the same shape, so
-only the features requiring it go dark.
+Tier 2 — main world. Game state lives on page objects a content script cannot
+see, so `src/world/gameBridge.js` runs in the page world and answers queries over
+a CustomEvent pair; `api/game.js` is the isolated-world client. This is the only
+code that reads the game's internals and the only one expected to break on a
+game update — keep it that way, and let the features that require it go dark
+rather than spreading page-world access around.
 
 ## Testing in the game
 
@@ -114,9 +115,8 @@ game's `src/` before using one that is not already here.
 ## Automation
 
 Features that act on the user's behalf are individually toggleable and **off by
-default**. They act through synthetic input events dispatched on `window` — the
-same path a human input takes — behind an `api/input.js` written when the first
-such feature lands. The game's `InputHandler` matches on `event.code` and
-`shiftKey` only and does not check `isTrusted`, and keybinds are user
-configurable, so that module must resolve the user's actual binding rather than
-hardcode keys.
+default**. They act through `api/input.js`, which dispatches synthetic events on
+`window` — the same path a human input takes. The game's `InputHandler` matches
+on `event.code` and `shiftKey` only and does not check `isTrusted`, and keybinds
+are user configurable, so that module resolves the user's actual binding rather
+than hardcoding keys.

@@ -42,9 +42,8 @@ export const pressBuildKey = (action) => {
 export const confirmBuild = () => sendKey("keydown", "Enter", false);
 
 // The game tracks the cursor through mousemove events that report movement, and
-// confirms a structure wherever it last saw it — this is what lets us build at a
-// fixed point without holding the real mouse there.
-export const moveCursorTo = (x, y) =>
+// both validates and places a structure wherever it last saw it.
+const moveCursorTo = (x, y) =>
   window.dispatchEvent(
     new MouseEvent("mousemove", {
       clientX: x,
@@ -58,3 +57,23 @@ export const moveCursorTo = (x, y) =>
 // Clears any ghost structure and resets the x5 multiplier, so a batch always
 // starts from a known state whatever the previous one left behind.
 export const pressEscape = () => sendKey("keydown", "Escape", false);
+
+// Holds the game's idea of the cursor at one point until released. A real mouse
+// move is swallowed and replaced by ours, because the game validates the ghost
+// against its last known cursor tile — letting one through retargets the build.
+export const pinCursor = (x, y) => {
+  let ours = false;
+  const send = () => {
+    ours = true;
+    moveCursorTo(x, y);
+    ours = false;
+  };
+  const onRealMove = (event) => {
+    if (ours) return;
+    event.stopPropagation();
+    send();
+  };
+  window.addEventListener("mousemove", onRealMove, true);
+  send();
+  return () => window.removeEventListener("mousemove", onRealMove, true);
+};

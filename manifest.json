@@ -8,6 +8,12 @@
       "matches": ["https://*.openfront.io/*", "http://localhost/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://*.openfront.io/*", "http://localhost/*"],
+      "js": ["src/world/gameBridge.js"],
+      "world": "MAIN",
+      "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [

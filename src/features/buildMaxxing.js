@@ -1,10 +1,11 @@
 import {
   BUILD_ACTIONS,
   confirmBuild,
-  moveCursorTo,
+  pinCursor,
   pressBuildKey,
   pressEscape,
 } from "../api/input.js";
+import { inspect } from "../api/game.js";
 import { createPanel } from "../ui/panel.js";
 
 const LABELS = {
@@ -36,26 +37,21 @@ const BATCH_SIZE = 5;
 
 const KEY_DELAY_MS = 100;
 const BUILD_DELAY_MS = 300;
+const POLL_INTERVAL_MS = 500;
+const POLL_TIMEOUT_MS = 60000;
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export const planBatches = (action, count) => {
-  if (BATCHABLE_ON_BUILD.has(action)) {
-    return [
-      ...Array(Math.floor(count / BATCH_SIZE)).fill(BATCH_SIZE),
-      ...Array(count % BATCH_SIZE).fill(1),
-    ];
-  }
-  if (!BATCHABLE_ON_UPGRADE.has(action)) return Array(count).fill(1);
+const chunk = (count) => [
+  ...Array(Math.floor(count / BATCH_SIZE)).fill(BATCH_SIZE),
+  ...Array(count % BATCH_SIZE).fill(1),
+];
 
-  // The first action on the locked tile builds, and a build ignores the
-  // multiplier; only the upgrades that follow can be batched.
-  const upgrades = count - 1;
-  return [
-    1,
-    ...Array(Math.floor(upgrades / BATCH_SIZE)).fill(BATCH_SIZE),
-    ...Array(upgrades % BATCH_SIZE).fill(1),
-  ];
+export const planBatches = (action, count, firstIsBuild) => {
+  if (BATCHABLE_ON_BUILD.has(action)) return chunk(count);
+  if (!BATCHABLE_ON_UPGRADE.has(action)) return Array(count).fill(1);
+  // A build ignores the multiplier, so only the upgrades that follow batch.
+  return firstIsBuild ? [1, ...chunk(count - 1)] : chunk(count);
 };
 
 const runBatch = async (action, size, x, y) => {
@@ -67,9 +63,27 @@ const runBatch = async (action, size, x, y) => {
     pressBuildKey(action);
   }
   await wait(KEY_DELAY_MS);
-  moveCursorTo(x, y);
   confirmBuild();
   await wait(BUILD_DELAY_MS);
+};
+
+// A structure cannot be upgraded while it is still under construction, and gold
+// may not have caught up yet, so wait for the game to say the next batch is
+// actually possible instead of firing into a refusal.
+const waitUntilAffordable = async (point, action, size, signal) => {
+  const deadline = Date.now() + POLL_TIMEOUT_MS;
+  while (!signal.aborted) {
+    const state = await inspect(point.x, point.y, action);
+    if (!state.ready || !state.valid) return { blocked: "game not ready" };
+    if (state.canBuild || state.canUpgrade) {
+      if (BigInt(state.gold) >= BigInt(state.cost) * BigInt(size)) return {};
+      if (Date.now() > deadline) return { blocked: "not enough gold" };
+    } else if (Date.now() > deadline) {
+      return { blocked: "target not buildable" };
+    }
+    await wait(POLL_INTERVAL_MS);
+  }
+  return { blocked: "cancelled" };
 };
 
 const captureNextClick = (signal) =>
@@ -86,10 +100,7 @@ const captureNextClick = (signal) =>
       (event) => {
         swallow(event);
         for (const type of ["pointerup", "click"]) {
-          window.addEventListener(type, swallow, {
-            capture: true,
-            once: true,
-          });
+          window.addEventListener(type, swallow, { capture: true, once: true });
         }
         resolve({ x: event.clientX, y: event.clientY });
       },
@@ -135,15 +146,38 @@ const start = async (body) => {
     return;
   }
 
-  const batches = planBatches(action, count);
-  let done = 0;
-  for (const size of batches) {
-    if (abort.signal.aborted) break;
-    await runBatch(action, size, point.x, point.y);
-    done += size;
-    status.textContent = `${done}/${count}`;
+  const target = await inspect(point.x, point.y, action);
+  if (!target.ready) {
+    status.textContent = "No game running";
+  } else if (!target.valid || (!target.canBuild && !target.canUpgrade)) {
+    status.textContent = `Cannot place ${LABELS[action]} there`;
+  } else {
+    const release = pinCursor(point.x, point.y);
+    try {
+      const batches = planBatches(action, count, !target.canUpgrade);
+      let done = 0;
+      for (const size of batches) {
+        if (abort.signal.aborted) break;
+        const { blocked } = await waitUntilAffordable(
+          point,
+          action,
+          size,
+          abort.signal,
+        );
+        if (blocked) {
+          status.textContent = `Stopped at ${done}: ${blocked}`;
+          break;
+        }
+        await runBatch(action, size, point.x, point.y);
+        done += size;
+        status.textContent = `${done}/${count}`;
+      }
+      if (done >= count) status.textContent = "Done";
+    } finally {
+      release();
+    }
   }
-  status.textContent = abort.signal.aborted ? `Stopped at ${done}` : "Done";
+
   button.textContent = "Activate";
   abort = null;
 };
@@ -151,7 +185,7 @@ const start = async (body) => {
 export default {
   id: "buildMaxxing",
   name: "buildMaxxing",
-  requires: ["dom", "input"],
+  requires: ["dom", "input", "game"],
 
   enable() {
     const body = buildBody();
