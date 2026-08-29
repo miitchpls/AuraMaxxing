@@ -1,61 +1,88 @@
 import { host } from "../api/dom.js";
 
+const PANEL_ID = "auramaxxing-panel";
 const MARGIN_PX = 16;
+const WIDTH_PX = 220;
 
 // Tailwind classes are lifted from the game's own components: its stylesheet
 // only contains classes found in its source, so an invented one renders nothing.
 const PANEL_CLASS =
   "fixed z-900 flex flex-col p-2 bg-gray-800/92 backdrop-blur-sm shadow-xs rounded-lg text-white select-none";
-const COLLAPSE_CLASS =
-  "ml-auto cursor-pointer px-1 bg-gray-700/50 hover:bg-gray-600 border rounded-md border-slate-500 transition-colors";
+const TOGGLE_CLASS =
+  "cursor-pointer px-1 bg-gray-700/50 hover:bg-gray-600 border rounded-md border-slate-500 transition-colors";
+const SECTION_HEADER_CLASS = `flex items-center gap-2 w-full text-sm py-1 ${TOGGLE_CLASS}`;
 
 const clamp = (value, max) => Math.max(0, Math.min(value, max));
 
-const makeDraggable = (panel, handle) => {
+const makeDraggable = (element, handle) => {
   let grabX = 0;
   let grabY = 0;
 
   handle.addEventListener("pointerdown", (event) => {
-    if (event.target.closest("[data-collapse]")) return;
-    grabX = event.clientX - panel.offsetLeft;
-    grabY = event.clientY - panel.offsetTop;
+    if (event.target.closest("button")) return;
+    grabX = event.clientX - element.offsetLeft;
+    grabY = event.clientY - element.offsetTop;
     handle.setPointerCapture(event.pointerId);
     event.preventDefault();
   });
 
   handle.addEventListener("pointermove", (event) => {
     if (!handle.hasPointerCapture(event.pointerId)) return;
-    panel.style.left = `${clamp(event.clientX - grabX, window.innerWidth - panel.offsetWidth)}px`;
-    panel.style.top = `${clamp(event.clientY - grabY, window.innerHeight - panel.offsetHeight)}px`;
+    element.style.left = `${clamp(event.clientX - grabX, window.innerWidth - element.offsetWidth)}px`;
+    element.style.top = `${clamp(event.clientY - grabY, window.innerHeight - element.offsetHeight)}px`;
   });
 };
 
-const makeCollapsible = (panel, body) => {
-  const button = panel.querySelector("[data-collapse]");
+const makeToggle = (button, target) =>
   button.addEventListener("click", () => {
-    const collapsed = body.classList.toggle("hidden");
+    const collapsed = target.classList.toggle("hidden");
     button.innerHTML = collapsed ? "&plus;" : "&minus;";
   });
-};
 
-export const createPanel = ({ id, title, body, width = 220 }) => {
-  const panel = document.createElement("div");
-  panel.id = id;
+let panel = null;
+let sections = null;
+
+const createShell = () => {
+  panel = document.createElement("div");
+  panel.id = PANEL_ID;
   panel.className = PANEL_CLASS;
-  panel.style.cssText = `left:${MARGIN_PX}px;top:0;width:${width}px;`;
+  panel.style.cssText = `left:${MARGIN_PX}px;top:0;width:${WIDTH_PX}px;`;
   panel.innerHTML = `
     <div class="flex items-center gap-2 text-sm" style="cursor:move" data-drag>
-      <span>${title}</span>
-      <button class="${COLLAPSE_CLASS}" data-collapse>&minus;</button>
-    </div>`;
-
-  body.classList.add("mt-2");
-  panel.appendChild(body);
+      <span>AuraMaxxing</span>
+      <button class="ml-auto ${TOGGLE_CLASS}" data-collapse>&minus;</button>
+    </div>
+    <div class="flex flex-col gap-2 mt-2" data-sections></div>`;
   host().appendChild(panel);
 
+  sections = panel.querySelector("[data-sections]");
   panel.style.top = `${(window.innerHeight - panel.offsetHeight) / 2}px`;
   makeDraggable(panel, panel.querySelector("[data-drag]"));
-  makeCollapsible(panel, body);
+  makeToggle(panel.querySelector("[data-collapse]"), sections);
+};
 
-  return panel;
+export const addSection = ({ id, title, body }) => {
+  if (panel === null) createShell();
+
+  const section = document.createElement("div");
+  section.id = `auramaxxing-section-${id}`;
+  section.className = "flex flex-col";
+  section.innerHTML = `
+    <div class="${SECTION_HEADER_CLASS}">
+      <span>${title}</span>
+      <button class="ml-auto ${TOGGLE_CLASS}" data-collapse>&minus;</button>
+    </div>`;
+  body.classList.add("mt-2");
+  section.appendChild(body);
+  sections.appendChild(section);
+  makeToggle(section.querySelector("[data-collapse]"), body);
+
+  return () => {
+    section.remove();
+    if (sections.children.length === 0) {
+      panel.remove();
+      panel = null;
+      sections = null;
+    }
+  };
 };

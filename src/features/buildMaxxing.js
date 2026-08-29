@@ -6,7 +6,7 @@ import {
   pressEscape,
 } from "../api/input.js";
 import { inspect } from "../api/game.js";
-import { createPanel } from "../ui/panel.js";
+import { addSection } from "../ui/panel.js";
 
 const LABELS = {
   buildCity: "City",
@@ -126,7 +126,7 @@ const buildBody = () => {
   return body;
 };
 
-let panel = null;
+let removeSection = null;
 let abort = null;
 
 const start = async (body) => {
@@ -199,17 +199,13 @@ export default {
       }
       start(body);
     });
-    panel = createPanel({
-      id: "auramaxxing-buildmaxxing",
-      title: "buildMaxxing",
-      body,
-    });
+    removeSection = addSection({ id: "buildmaxxing", title: "buildMaxxing", body });
   },
 
   disable() {
     abort?.abort();
     abort = null;
-    panel?.remove();
-    panel = null;
+    removeSection?.();
+    removeSection = null;
   },
 };
