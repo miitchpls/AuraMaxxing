@@ -78,9 +78,9 @@ export const addSection = ({ id, title, body }) => {
   section.innerHTML = `
     <div class="${SECTION_HEADER_CLASS}">
       <span>${title}</span>
-      <button class="ml-auto ${TOGGLE_CLASS}" data-collapse>&minus;</button>
+      <button class="ml-auto ${TOGGLE_CLASS}" data-collapse>&plus;</button>
     </div>`;
-  body.classList.add("mt-2");
+  body.classList.add("mt-2", "hidden");
   section.appendChild(body);
   sections.appendChild(section);
   makeToggle(section.querySelector("[data-collapse]"), body);
