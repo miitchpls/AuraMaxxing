@@ -39,8 +39,6 @@ export const pressBuildKey = (action) => {
   return true;
 };
 
-export const confirmBuild = () => sendKey("keydown", "Enter", false);
-
 // The game tracks the cursor through mousemove events that report movement, and
 // both validates and places a structure wherever it last saw it.
 const moveCursorTo = (x, y) =>

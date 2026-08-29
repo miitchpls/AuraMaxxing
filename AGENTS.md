@@ -156,9 +156,17 @@ over 2000 bytes, or 5MB sent in total, is a kick rather than a drop.
 The per-minute figure is the real constraint: 150/min averages 2.5/s, so a burst
 at 10/s runs dry in about fifteen seconds.
 
-Anything that sends intents on its own goes through `api/rateLimit.js`, which
-paces to a fraction of both limits so the player keeps budget for their own
-moves. Never send in a tight loop, and never assume an intent landed.
+`api/intents.js` is the only way out to the server, and the only place that may
+dispatch something the server sees — `api/input.js` keeps the input that stays in
+the client. Everything queues there, so several features running at once cannot
+exceed the limits between them, and it paces to a fraction of both so the player
+keeps budget for their own moves. Never assume an intent landed.
+
+Order of release is the `PRIORITY` array at the top of that file: most urgent
+first, and anything not listed goes after, in arrival order. Keep the list short
+— priority is strict, so a listed feature that queues without pause starves
+everything below it. Pass the run's `AbortSignal` when queueing: an abandoned
+entry is then dropped without spending a slot.
 
 Batching beats pacing where the game offers it: the x5 build multiplier folds
 five actions into one intent.

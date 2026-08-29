@@ -1,14 +1,13 @@
 import {
   BUILD_ACTIONS,
   DRAG_THRESHOLD_PX,
-  confirmBuild,
   pinCursor,
   pressBuildKey,
   pressEscape,
   releasePointer,
 } from "../api/input.js";
 import { inspect, quote } from "../api/game.js";
-import { reserveIntent } from "../api/rateLimit.js";
+import { confirmBuild } from "../api/intents.js";
 import { addSection } from "../ui/panel.js";
 
 const LABELS = {
@@ -61,8 +60,8 @@ export const planBatches = (action, count, firstIsBuild) => {
 };
 
 // Only the confirm reaches the server; the key presses stay in the client. So
-// the intent budget is claimed right before confirming, never for a whole batch.
-const runBatch = async (action, size, x, y, onWait) => {
+// the batch queues at the tunnel once, right at the end, never as a whole.
+const runBatch = async (action, size, x, y, signal, onWait) => {
   pressEscape();
   await wait(KEY_DELAY_MS);
   pressBuildKey(action);
@@ -71,8 +70,7 @@ const runBatch = async (action, size, x, y, onWait) => {
     pressBuildKey(action);
   }
   await wait(KEY_DELAY_MS);
-  await reserveIntent(onWait);
-  confirmBuild();
+  await confirmBuild("buildMaxxing", { signal, onWait });
   await wait(BUILD_DELAY_MS);
 };
 
@@ -239,7 +237,7 @@ const start = async (body) => {
           status.textContent = `Stopped at ${done}: ${blocked}`;
           break;
         }
-        await runBatch(action, size, point.x, point.y, () => {
+        await runBatch(action, size, point.x, point.y, abort.signal, () => {
           status.textContent = `${done}/${count} — pacing`;
         });
         done += size;
@@ -259,7 +257,7 @@ const start = async (body) => {
 export default {
   id: "buildMaxxing",
   name: "buildMaxxing",
-  requires: ["dom", "input", "game"],
+  requires: ["dom", "game", "input", "intents"],
 
   enable() {
     const body = buildBody();
