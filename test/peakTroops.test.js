@@ -5,6 +5,7 @@ import {
   peakTroopTarget,
   troopIncreaseRateAt,
 } from "../src/api/game.js";
+import { peakGaugePosition } from "../src/features/peakMaxxing.js";
 
 const maxTroops = 100000;
 const target = peakTroopTarget(maxTroops);
@@ -28,5 +29,11 @@ assert.ok(60000 * (1 - (surplus.attackPercent + 1) / 100) < target);
 assert.equal(peakTroopPlan(40000, maxTroops).attackPercent, 0);
 assert.equal(peakTroopPlan(-1, maxTroops), null);
 assert.equal(peakTroopTarget(0), null);
+
+assert.equal(peakGaugePosition(0.92, 40000, 50000), 46);
+assert.equal(peakGaugePosition(0.92, 60000, 50000), 54);
+assert.equal(peakGaugePosition(1, 50000, 50000), 50);
+assert.equal(peakGaugePosition(0, 40000, 50000), 0);
+assert.equal(peakGaugePosition(0, 60000, 50000), 100);
 
 console.log("peakTroops ok");
