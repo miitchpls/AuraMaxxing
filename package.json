@@ -1,0 +1,8 @@
+{
+  "name": "auramaxxing",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test/planBatches.test.js && node test/projectCost.test.js && node test/input.test.js && node test/gameBridge.test.js && node test/intents.test.js"
+  }
+}
