@@ -44,3 +44,12 @@ far less gold than paying the rising price.
 
 It needs a rough model of how the tribe AI decides to attack, and probably
 reading tribe ids out of the game state in the browser.
+
+## Player density heatmap
+
+A toggle that shows a heatmap of where players are spread across the map, so at
+the start of a game you can see which areas are crowded and which are empty.
+
+A version that also weighs the terrain to suggest a best spawn point was
+considered, but empty ground is not automatically better: an area with nobody in
+it means no trade early on.
