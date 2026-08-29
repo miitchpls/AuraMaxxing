@@ -21,19 +21,23 @@ const clamp = (value, max) => Math.max(0, Math.min(value, max));
 const makeDraggable = (element, handle) => {
   let grabX = 0;
   let grabY = 0;
+  let maxLeft = 0;
+  let maxTop = 0;
 
   handle.addEventListener("pointerdown", (event) => {
     if (event.target.closest("button")) return;
     grabX = event.clientX - element.offsetLeft;
     grabY = event.clientY - element.offsetTop;
+    maxLeft = window.innerWidth - element.offsetWidth;
+    maxTop = window.innerHeight - element.offsetHeight;
     handle.setPointerCapture(event.pointerId);
     event.preventDefault();
   });
 
   handle.addEventListener("pointermove", (event) => {
     if (!handle.hasPointerCapture(event.pointerId)) return;
-    element.style.left = `${clamp(event.clientX - grabX, window.innerWidth - element.offsetWidth)}px`;
-    element.style.top = `${clamp(event.clientY - grabY, window.innerHeight - element.offsetHeight)}px`;
+    element.style.left = `${clamp(event.clientX - grabX, maxLeft)}px`;
+    element.style.top = `${clamp(event.clientY - grabY, maxTop)}px`;
   });
 };
 

@@ -45,25 +45,44 @@ const ask = (payload) =>
     );
   });
 
-export const inspect = (x, y, action) =>
-  ask({ kind: "inspect", screenX: x, screenY: y, unitType: UNIT_TYPES[action] });
+export const inspect = (x, y, action, count = 1) =>
+  ask({
+    kind: "inspect",
+    screenX: x,
+    screenY: y,
+    unitType: UNIT_TYPES[action],
+    count,
+  });
 
-// The game caps only the types whose price escalates: cities, factories and
-// ports double per unit, warships step by a fixed amount, everything else is
-// flat. Used when the player owns none of a type, so the game has no running
-// totals to give and only the next price is known.
-const PRICE_CAP = 1000000n;
-const DOUBLING = new Set(["City", "Factory", "Port"]);
-const STEPPING = new Map([["Warship", 250000n]]);
+const DOUBLING = new Map([
+  ["City", 1000000n],
+  ["Factory", 1000000n],
+  ["Port", 1000000n],
+]);
+const STEPPING = new Map([
+  ["Defense Post", { step: 50000n, cap: 250000n }],
+  ["SAM Launcher", { step: 1500000n, cap: 3000000n }],
+  ["Warship", { step: 250000n, cap: 1000000n }],
+  ["MIRV", { step: 15000000n }],
+]);
 
 export const projectCost = (unitType, base, count) => {
-  const capped = (next) => (next > PRICE_CAP ? PRICE_CAP : next);
   let price = base;
   let total = 0n;
   for (let i = 0; i < count; i++) {
     total += price;
-    if (DOUBLING.has(unitType)) price = capped(price * 2n);
-    else if (STEPPING.has(unitType)) price = capped(price + STEPPING.get(unitType));
+    const doublingCap = DOUBLING.get(unitType);
+    const stepping = STEPPING.get(unitType);
+    if (doublingCap !== undefined) {
+      const next = price * 2n;
+      price = next > doublingCap ? doublingCap : next;
+    } else if (stepping !== undefined) {
+      const next = price + stepping.step;
+      price =
+        stepping.cap !== undefined && next > stepping.cap
+          ? stepping.cap
+          : next;
+    }
   }
   return total;
 };

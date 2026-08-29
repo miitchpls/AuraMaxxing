@@ -20,7 +20,8 @@ export const available = () => settingsAvailable();
 const binding = (action) => {
   const stored = keybinds()[action];
   const value = stored?.value ?? (Array.isArray(stored) ? stored[0] : stored);
-  if (typeof value === "string" && value !== "Null") return value;
+  if (value === "Null") return undefined;
+  if (typeof value === "string") return value;
   return DEFAULT_BINDINGS[action];
 };
 

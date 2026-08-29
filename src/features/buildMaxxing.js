@@ -45,7 +45,29 @@ const POLL_INTERVAL_MS = 500;
 const COST_REFRESH_MS = 2000;
 const POLL_TIMEOUT_MS = 60000;
 
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const wait = (ms, signal) =>
+  new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    const timer = setTimeout(done, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+      reject(signal.reason);
+    };
+    function done() {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+
+export const parseCount = (value) => {
+  const count = Number(value);
+  return Number.isSafeInteger(count) && count >= 1 ? count : null;
+};
 
 const chunk = (count) => [
   ...Array(Math.floor(count / BATCH_SIZE)).fill(BATCH_SIZE),
@@ -62,17 +84,24 @@ export const planBatches = (action, count, firstIsBuild) => {
 // Only the confirm reaches the server; the key presses stay in the client. So
 // the batch queues at the tunnel once, right at the end, never as a whole.
 const runBatch = async (action, size, x, y, signal, onWait) => {
+  if (signal.aborted) throw signal.reason;
   pressEscape();
-  await wait(KEY_DELAY_MS);
-  pressBuildKey(action);
+  await wait(KEY_DELAY_MS, signal);
+  if (!pressBuildKey(action)) throw new Error("Build key is unbound");
   if (size === BATCH_SIZE) {
-    await wait(KEY_DELAY_MS);
-    pressBuildKey(action);
+    await wait(KEY_DELAY_MS, signal);
+    if (!pressBuildKey(action)) throw new Error("Build key is unbound");
   }
-  await wait(KEY_DELAY_MS);
+  await wait(KEY_DELAY_MS, signal);
   await confirmBuild("buildMaxxing", { signal, onWait });
-  await wait(BUILD_DELAY_MS);
+  await wait(BUILD_DELAY_MS, signal);
 };
+
+export const batchAffordable = (state, action, size) =>
+  state.batchCost !== null &&
+  state.batchCost !== undefined &&
+  BigInt(state.gold) >= BigInt(state.batchCost) &&
+  (action !== "buildAtomBomb" || state.readyMissiles >= size);
 
 // A structure cannot be upgraded while it is still under construction, and gold
 // may not have caught up yet, so wait for the game to say the next batch is
@@ -80,34 +109,61 @@ const runBatch = async (action, size, x, y, signal, onWait) => {
 const waitUntilAffordable = async (point, action, size, signal) => {
   const deadline = Date.now() + POLL_TIMEOUT_MS;
   while (!signal.aborted) {
-    const state = await inspect(point.x, point.y, action);
+    const state = await inspect(point.x, point.y, action, size);
+    if (signal.aborted) throw signal.reason;
     if (!state.ready || !state.valid) return { blocked: "game not ready" };
     if (state.canBuild || state.canUpgrade) {
-      if (BigInt(state.gold) >= BigInt(state.cost) * BigInt(size)) return {};
-      if (Date.now() > deadline) return { blocked: "not enough gold" };
+      if (state.batchCost === null || state.batchCost === undefined) {
+        return { blocked: "price unavailable" };
+      }
+      if (batchAffordable(state, action, size)) return {};
+      if (Date.now() > deadline) {
+        return {
+          blocked:
+            BigInt(state.gold) < BigInt(state.batchCost)
+              ? "not enough gold"
+              : "not enough ready missiles",
+        };
+      }
     } else if (Date.now() > deadline) {
       return { blocked: "target not buildable" };
     }
-    await wait(POLL_INTERVAL_MS);
+    await wait(POLL_INTERVAL_MS, signal);
   }
   return { blocked: "cancelled" };
 };
 
 // Resolves on a click, never on a drag: a press-and-drag has to reach the game
 // so the map still pans while we are waiting for the target.
-const captureNextClick = (signal) =>
+const captureNextClick = (signal, ignoredRoot) =>
   new Promise((resolve, reject) => {
-    let startX = 0;
-    let startY = 0;
+    let down = null;
 
     const onDown = (event) => {
-      startX = event.clientX;
-      startY = event.clientY;
+      if (ignoredRoot?.contains(event.target)) {
+        down = null;
+        return;
+      }
+      down = {
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+      };
     };
 
     const onUp = (event) => {
+      if (
+        down === null ||
+        down.pointerId !== event.pointerId ||
+        ignoredRoot?.contains(event.target)
+      ) {
+        down = null;
+        return;
+      }
       const moved =
-        Math.abs(event.clientX - startX) + Math.abs(event.clientY - startY);
+        Math.abs(event.clientX - down.x) + Math.abs(event.clientY - down.y);
+      const start = down;
+      down = null;
       if (moved >= DRAG_THRESHOLD_PX) return;
 
       event.preventDefault();
@@ -121,23 +177,26 @@ const captureNextClick = (signal) =>
         { capture: true, once: true },
       );
       stop();
-      releasePointer(event.pointerId, startX, startY);
+      releasePointer(event.pointerId, start.x, start.y);
       resolve({ x: event.clientX, y: event.clientY });
     };
 
     const stop = () => {
       window.removeEventListener("pointerdown", onDown, true);
       window.removeEventListener("pointerup", onUp, true);
+      signal.removeEventListener("abort", onAbort);
     };
 
-    signal.addEventListener(
-      "abort",
-      () => {
-        stop();
-        reject(signal.reason);
-      },
-      { once: true },
-    );
+    const onAbort = () => {
+      stop();
+      reject(signal.reason);
+    };
+
+    if (signal.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    signal.addEventListener("abort", onAbort, { once: true });
     window.addEventListener("pointerdown", onDown, true);
     window.addEventListener("pointerup", onUp, true);
   });
@@ -151,7 +210,7 @@ const buildBody = () => {
         (action) => `<option value="${action}">${LABELS[action]}</option>`,
       ).join("")}
     </select>
-    <input type="number" min="1" value="10"
+    <input type="number" min="1" step="1" value="10"
       class="w-full px-1 py-1 bg-gray-700/50 border border-slate-500 rounded-md text-white" data-count />
     <button class="w-full px-1 py-1 cursor-pointer bg-gray-700/50 hover:bg-gray-600 border border-slate-500 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed" data-run>
       Activate
@@ -171,11 +230,21 @@ const showCost = async (body) => {
   const label = body.querySelector("[data-cost]");
   const button = body.querySelector("[data-run]");
   const action = body.querySelector("[data-entity]").value;
-  const count = Math.max(1, Number(body.querySelector("[data-count]").value));
+  const count = parseCount(body.querySelector("[data-count]").value);
+
+  if (activeRun !== null) return;
+  if (count === null) {
+    label.textContent = "Count must be a whole number of at least 1";
+    label.classList.add("text-red-400");
+    label.classList.remove("text-slate-400");
+    button.disabled = true;
+    return;
+  }
+
   const price = await quote(action, count);
 
   // A run in progress owns the button; it reads Cancel and must stay clickable.
-  if (abort !== null) return;
+  if (activeRun !== null) return;
 
   if (!price.ready) {
     label.textContent = "";
@@ -196,62 +265,94 @@ const showCost = async (body) => {
 
 let removeSection = null;
 let costTimer = null;
-let abort = null;
+let activeRun = null;
+
+const refreshCost = (body) => {
+  showCost(body).catch(() => {
+    if (activeRun !== null) return;
+    body.querySelector("[data-cost]").textContent = "Cost unavailable";
+    body.querySelector("[data-run]").disabled = false;
+  });
+};
+
+const cancelActiveRun = (body) => {
+  const run = activeRun;
+  if (run === null) return;
+  activeRun = null;
+  run.controller.abort();
+  body.querySelector("[data-run]").textContent = "Activate";
+  body.querySelector("[data-status]").textContent = "Idle";
+  refreshCost(body);
+};
 
 const start = async (body) => {
   const action = body.querySelector("[data-entity]").value;
-  const count = Math.max(1, Number(body.querySelector("[data-count]").value));
+  const count = parseCount(body.querySelector("[data-count]").value);
   const status = body.querySelector("[data-status]");
   const button = body.querySelector("[data-run]");
 
-  abort = new AbortController();
-  button.textContent = "Cancel";
-  status.textContent = "Click the target tile";
-
-  let point;
-  try {
-    point = await captureNextClick(abort.signal);
-  } catch {
+  if (count === null) {
+    status.textContent = "Count must be a whole number of at least 1";
+    refreshCost(body);
     return;
   }
 
-  const target = await inspect(point.x, point.y, action);
-  if (!target.ready) {
-    status.textContent = "No game running";
-  } else if (!target.valid || (!target.canBuild && !target.canUpgrade)) {
-    status.textContent = `Cannot place ${LABELS[action]} there`;
-  } else {
-    const release = pinCursor(point.x, point.y);
-    try {
+  const run = { controller: new AbortController() };
+  const signal = run.controller.signal;
+  activeRun = run;
+  button.textContent = "Cancel";
+  status.textContent = "Click the target tile";
+
+  let release = null;
+  try {
+    const point = await captureNextClick(
+      signal,
+      body.closest("#auramaxxing-panel"),
+    );
+
+    const target = await inspect(point.x, point.y, action);
+    if (signal.aborted) return;
+    if (!target.ready) {
+      status.textContent = "No game running";
+    } else if (!target.valid || (!target.canBuild && !target.canUpgrade)) {
+      status.textContent = `Cannot place ${LABELS[action]} there`;
+    } else {
+      release = pinCursor(point.x, point.y);
       const batches = planBatches(action, count, !target.canUpgrade);
       let done = 0;
       for (const size of batches) {
-        if (abort.signal.aborted) break;
+        if (signal.aborted) break;
         const { blocked } = await waitUntilAffordable(
           point,
           action,
           size,
-          abort.signal,
+          signal,
         );
         if (blocked) {
           status.textContent = `Stopped at ${done}: ${blocked}`;
           break;
         }
-        await runBatch(action, size, point.x, point.y, abort.signal, () => {
+        await runBatch(action, size, point.x, point.y, signal, () => {
           status.textContent = `${done}/${count} — pacing`;
         });
         done += size;
         status.textContent = `${done}/${count}`;
       }
       if (done >= count) status.textContent = "Done";
-    } finally {
-      release();
+    }
+  } catch (error) {
+    if (!signal.aborted && activeRun === run) {
+      status.textContent = error instanceof Error ? error.message : "Build failed";
+      console.error("[AuraMaxxing] buildMaxxing run failed", error);
+    }
+  } finally {
+    release?.();
+    if (activeRun === run) {
+      activeRun = null;
+      button.textContent = "Activate";
+      refreshCost(body);
     }
   }
-
-  button.textContent = "Activate";
-  abort = null;
-  showCost(body);
 };
 
 export default {
@@ -262,26 +363,26 @@ export default {
   enable() {
     const body = buildBody();
     for (const field of ["[data-entity]", "[data-count]"]) {
-      body.querySelector(field).addEventListener("change", () => showCost(body));
+      body.querySelector(field).addEventListener("change", () => refreshCost(body));
     }
-    showCost(body);
-    costTimer = setInterval(() => showCost(body), COST_REFRESH_MS);
+    refreshCost(body);
+    costTimer = setInterval(() => refreshCost(body), COST_REFRESH_MS);
     body.querySelector("[data-run]").addEventListener("click", () => {
-      if (abort) {
-        abort.abort();
-        abort = null;
-        body.querySelector("[data-run]").textContent = "Activate";
-        body.querySelector("[data-status]").textContent = "Idle";
+      if (activeRun !== null) {
+        cancelActiveRun(body);
         return;
       }
-      start(body);
+      void start(body).catch((error) => {
+        console.error("[AuraMaxxing] buildMaxxing start failed", error);
+      });
     });
     removeSection = addSection({ id: "buildmaxxing", title: "BuildMaxxing", body });
   },
 
   disable() {
-    abort?.abort();
-    abort = null;
+    const run = activeRun;
+    activeRun = null;
+    run?.controller.abort();
     clearInterval(costTimer);
     costTimer = null;
     removeSection?.();

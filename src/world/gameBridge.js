@@ -9,12 +9,14 @@ const reply = (data) =>
     new CustomEvent(RESPONSE, { detail: JSON.stringify(data) }),
   );
 
-const inspect = async ({ id, screenX, screenY, unitType }) => {
+const inspect = async ({ id, screenX, screenY, unitType, count = 1 }) => {
   const element = document.querySelector("build-menu");
   const game = element?.game;
   const transform = element?.transformHandler;
   const player = game?.myPlayer?.();
-  if (!game || !transform || !player) return reply({ kind: "inspect", id, ready: false });
+  if (!game || !transform || !player) {
+    return reply({ kind: "inspect", id, ready: false });
+  }
 
   const world = transform.screenToWorldCoordinates(screenX, screenY);
   if (!world || !game.isValidCoord(world.x, world.y)) {
@@ -23,15 +25,23 @@ const inspect = async ({ id, screenX, screenY, unitType }) => {
 
   const found = await player.buildables(game.ref(world.x, world.y), [unitType]);
   const unit = (Array.isArray(found) ? found : [found])[0];
+  if (!unit) return reply({ kind: "inspect", id, ready: false });
+
+  const batchCost = unit.upgradeCosts
+    ? unit.upgradeCosts[count - 1]
+    : unit.cost * BigInt(count);
   reply({
     kind: "inspect",
     id,
     ready: true,
     valid: true,
-    canBuild: unit?.canBuild !== false,
-    canUpgrade: unit?.canUpgrade !== false,
-    cost: String(unit?.cost ?? 0),
+    canBuild: unit.canBuild !== false,
+    canUpgrade: unit.canUpgrade !== false,
+    cost: String(unit.cost),
+    batchCost: batchCost === undefined ? null : String(batchCost),
     gold: String(player.gold()),
+    readyMissiles:
+      unitType === "Atom Bomb" ? player.readyMissileCount() : null,
   });
 };
 
