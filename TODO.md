@@ -53,3 +53,13 @@ the start of a game you can see which areas are crowded and which are empty.
 A version that also weighs the terrain to suggest a best spawn point was
 considered, but empty ground is not automatically better: an area with nobody in
 it means no trade early on.
+
+## Attack timing
+
+Troops are generated along a bell curve. Read that algorithm and use it to tell
+you the best moments to attack: stay at the peak of the curve and attack with
+the troop percentage that keeps you there. Sitting at the peak and then
+attacking with 70% is not sustainable, because it drops you off the curve.
+
+Could be automatic attacking, or purely visual indicators showing the same
+information and leaving the attack to you.
