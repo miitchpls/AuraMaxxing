@@ -19,6 +19,11 @@ const UNIT_TYPES = {
   buildMIRV: "MIRV",
 };
 
+// The testing flow in AGENTS.md runs two clients at once — the installed
+// extension and a copy loaded from the dev server — and the bridge echoes ids
+// back verbatim, so a bare counter would let one client consume the other's
+// reply. The prefix makes each client's ids its own.
+const CLIENT = Math.random().toString(36).slice(2, 10);
 let lastId = 0;
 
 export const available = () =>
@@ -26,7 +31,7 @@ export const available = () =>
 
 const ask = (payload) =>
   new Promise((resolve) => {
-    const id = ++lastId;
+    const id = `${CLIENT}-${++lastId}`;
     const kind = payload.kind ?? "inspect";
     const onResponse = (event) => {
       const data = JSON.parse(event.detail);
