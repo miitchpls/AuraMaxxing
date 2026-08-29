@@ -115,12 +115,161 @@ const quote = async ({ id, unitType, count }) => {
   });
 };
 
+// The extension cannot import constructors from the game's bundle, but the bus
+// keeps the exact runtime constructor identities registered by its transport.
+const findEventType = (eventBus, constructorName, transportHandler) => {
+  if (!(eventBus?.listeners instanceof Map)) return null;
+  for (const [type, listeners] of eventBus.listeners) {
+    if (type.name === constructorName) return type;
+    if (
+      listeners.some((listener) =>
+        Function.prototype.toString.call(listener).includes(transportHandler),
+      )
+    ) {
+      return type;
+    }
+  }
+  return null;
+};
+
+const allianceContext = () => {
+  const element = document.querySelector("build-menu");
+  const game = element?.game;
+  const eventBus = element?.eventBus;
+  const player = game?.myPlayer?.();
+  if (!game || !eventBus || !player) return null;
+
+  const requestType = findEventType(
+    eventBus,
+    "SendAllianceRequestIntentEvent",
+    "onSendAllianceRequest",
+  );
+  const extensionType = findEventType(
+    eventBus,
+    "SendAllianceExtensionIntentEvent",
+    "onSendAllianceExtensionIntent",
+  );
+  if (!requestType || !extensionType) return null;
+  return { game, eventBus, player, requestType, extensionType };
+};
+
+const playerTile = async (game, player) => {
+  const location = player.nameLocation?.();
+  if (
+    location &&
+    game.isValidCoord(location.x, location.y) &&
+    game.owner(game.ref(location.x, location.y))?.id?.() === player.id()
+  ) {
+    return game.ref(location.x, location.y);
+  }
+  const borders = await player.borderTiles?.();
+  return borders?.borderTiles?.values().next().value ?? null;
+};
+
+const interactionWith = async (game, player, other) => {
+  const tile = await playerTile(game, other);
+  if (tile === null) return null;
+  const actions = await player.actions(tile, null);
+  return actions?.interaction ?? null;
+};
+
+const allianceState = async ({ id }) => {
+  const context = allianceContext();
+  if (!context || !context.player.isAlive()) {
+    return reply({ kind: "allianceState", id, ready: false });
+  }
+
+  const { game, player } = context;
+  const candidates = game
+    .players()
+    .filter((other) => {
+      const allied = player.isAlliedWith(other);
+      return (
+        other !== player &&
+        other.isAlive() &&
+        !other.isDisconnected() &&
+        (!player.isFriendly(other) || allied) &&
+        !player.isRequestingAllianceWith(other)
+      );
+    });
+
+  const actions = await Promise.all(
+    candidates.map(async (other) => {
+      try {
+        const interaction = await interactionWith(game, player, other);
+        if (interaction?.canSendAllianceRequest) {
+          return { type: "request", recipient: other.id() };
+        }
+        if (interaction?.allianceInfo?.canExtend) {
+          return { type: "extension", recipient: other.id() };
+        }
+      } catch {
+        return null;
+      }
+      return null;
+    }),
+  );
+
+  reply({
+    kind: "allianceState",
+    id,
+    ready: true,
+    actions: actions.filter((action) => action !== null),
+  });
+};
+
+const cancelledAllianceActions = new Set();
+
+const allianceCancel = async ({ id, token }) => {
+  if (typeof token === "string") cancelledAllianceActions.add(token);
+  reply({ kind: "allianceCancel", id, ready: true });
+};
+
+const allianceAction = async ({ id, action, recipient, token }) => {
+  const context = allianceContext();
+  if (!context || !context.player.isAlive()) {
+    return reply({ kind: "allianceAction", id, ready: false, sent: false });
+  }
+
+  const { game, eventBus, player, requestType, extensionType } = context;
+  const other = game.players().find((candidate) => candidate.id() === recipient);
+  if (!other || other === player) {
+    return reply({ kind: "allianceAction", id, ready: true, sent: false });
+  }
+
+  const interaction = await interactionWith(game, player, other);
+  if (cancelledAllianceActions.delete(token)) {
+    return reply({ kind: "allianceAction", id, ready: true, sent: false });
+  }
+  if (action === "request" && interaction?.canSendAllianceRequest) {
+    eventBus.emit(new requestType(player, other));
+    return reply({ kind: "allianceAction", id, ready: true, sent: true });
+  }
+  if (action === "extension" && interaction?.allianceInfo?.canExtend) {
+    eventBus.emit(new extensionType(other));
+    return reply({ kind: "allianceAction", id, ready: true, sent: true });
+  }
+  reply({ kind: "allianceAction", id, ready: true, sent: false });
+};
+
+const handlers = {
+  quote,
+  project,
+  allianceState,
+  allianceAction,
+  allianceCancel,
+};
+
 window.addEventListener(REQUEST, (event) => {
   const request = JSON.parse(event.detail);
   const kind = request.kind ?? "inspect";
-  const handler =
-    kind === "quote" ? quote : kind === "project" ? project : inspect;
-  handler(request).catch(() => reply({ kind, id: request.id, ready: false }));
+  const handler = Object.hasOwn(handlers, kind) ? handlers[kind] : inspect;
+  handler(request).catch(() => {
+    if (kind === "allianceAction") {
+      cancelledAllianceActions.delete(request.token);
+    }
+    reply({ kind, id: request.id, ready: false });
+  });
 });
 
 document.documentElement.dataset.auramaxxingBridge = "1";
