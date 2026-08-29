@@ -16,6 +16,9 @@ when the game changes.
 ## Git
 
 - Never commit to `main` unless explicitly asked.
+- Starting a new feature: first update the parent OpenFront repo (`git -C ..
+  pull`) so the feature is written and tested against the current game. The API
+  layer is only worth anything if it is aimed at the version people play.
 - New feature → new branch `feature/<name>`. Commit freely there.
 - On a feature branch, push right after every commit (`git push -u origin HEAD`
   on the first one) so `origin` is never behind. This does not apply to `main`.
@@ -66,6 +69,18 @@ Tier 2 — main world. Reading real game state requires injecting into the page
 world and patching minified code; it will break on game deploys. When it is
 needed it goes in a single sacrificial `api/game.js` with the same shape, so
 only the features requiring it go dark.
+
+## Testing in the game
+
+Run the game from the parent repo (`npm run dev`, http://localhost:9000) and set
+up the singleplayer game so nothing but the feature can fail. The options are
+settable as properties on the `single-player-modal` element before starting:
+
+- `nations = 0` — no nations, tribes only. Nation AI muddies what caused what.
+- `infiniteGold = true` (or `startingGold` with a large `startingGoldValue`) —
+  a build that silently does nothing because the player is short of gold looks
+  exactly like a broken feature.
+- `instantBuild = true` when the test is about issuing builds, not waiting.
 
 ## Performance — non-negotiable
 
