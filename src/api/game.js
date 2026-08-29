@@ -157,17 +157,6 @@ export const peakTroopTarget = (maxTroops) => {
   return (belowPeak + abovePeak) / 2;
 };
 
-export const peakTroopPlan = (troops, maxTroops) => {
-  if (!Number.isFinite(troops) || troops < 0) return null;
-  const targetTroops = peakTroopTarget(maxTroops);
-  if (targetTroops === null) return null;
-  const surplusRatio = troops > 0 ? (troops - targetTroops) / troops : 0;
-  return {
-    targetTroops,
-    attackPercent: Math.max(0, Math.floor(surplusRatio * 100)),
-  };
-};
-
 export const troopState = () => ask({ kind: "troops" });
 
 export const allianceActions = () => ask({ kind: "allianceState" });

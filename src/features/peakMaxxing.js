@@ -1,5 +1,5 @@
 import {
-  peakTroopPlan,
+  peakTroopTarget,
   toDisplayedTroops,
   troopIncreaseRateAt,
   troopState,
@@ -51,7 +51,6 @@ const buildBody = () => {
       </div>
       <div class="text-xs text-slate-400 text-center">100%</div>
       <div class="mt-1" data-target></div>
-      <div data-advice></div>
     </div>`;
   return body;
 };
@@ -63,13 +62,13 @@ const clearBody = (body, message) => {
 };
 
 const render = (body, state) => {
-  const plan = peakTroopPlan(state.troops, state.maxTroops);
-  if (plan === null) {
+  const peakTroops = peakTroopTarget(state.maxTroops);
+  if (peakTroops === null) {
     clearBody(body, "Troop curve unavailable");
     return;
   }
 
-  const peakRate = troopIncreaseRateAt(plan.targetTroops, state.maxTroops) * 10;
+  const peakRate = troopIncreaseRateAt(peakTroops, state.maxTroops) * 10;
   const rateRatio = Math.max(
     0,
     Math.min(1, state.increasePerSecond / peakRate),
@@ -78,9 +77,9 @@ const render = (body, state) => {
   const gaugePosition = peakGaugePosition(
     rateRatio,
     state.troops,
-    plan.targetTroops,
+    peakTroops,
   );
-  const targetTroops = formatTroops(plan.targetTroops);
+  const targetTroops = formatTroops(peakTroops);
 
   body.querySelector("[data-status]").classList.add("hidden");
   body.querySelector("[data-live]").classList.remove("hidden");
@@ -92,12 +91,6 @@ const render = (body, state) => {
   body.querySelector("[data-marker]").style.left = `${gaugePosition}%`;
   body.querySelector("[data-target]").textContent =
     `Peak: ${targetTroops} troops`;
-  body.querySelector("[data-advice]").textContent =
-    plan.attackPercent > 0
-      ? `Attack up to ${plan.attackPercent}% now`
-      : state.troops < plan.targetTroops
-        ? `Hold until ${targetTroops} troops`
-        : `Keep at least ${targetTroops} troops`;
 };
 
 const refresh = async (body, currentSession) => {

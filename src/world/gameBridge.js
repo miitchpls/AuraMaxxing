@@ -121,7 +121,9 @@ const troops = async ({ id }) => {
   const game = element?.game;
   const player = game?.myPlayer?.();
   const config = game?.config?.();
-  if (!player || !config) return reply({ kind: "troops", id, ready: false });
+  if (!player?.isAlive() || !config) {
+    return reply({ kind: "troops", id, ready: false });
+  }
 
   const current = player.troops();
   const max = config.maxTroops(player);

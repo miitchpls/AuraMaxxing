@@ -70,7 +70,7 @@ const player = {
   readyMissileCount: () => 4,
   troops: () => 60000,
   id: () => "my-player",
-  isAlive: () => true,
+  isAlive: () => playerAlive,
   isFriendly: () => false,
   isRequestingAllianceWith: () => false,
   isAlliedWith: () => false,
@@ -80,6 +80,7 @@ const player = {
     return { interaction: allianceInteraction };
   },
 };
+let playerAlive = true;
 let activePlayer = player;
 const game = {
   myPlayer: () => activePlayer,
@@ -286,10 +287,17 @@ assert.deepEqual(await request({ kind: "troops" }), {
   maxTroops: 100000,
   increasePerSecond: 3215,
 });
-activePlayer = null;
+playerAlive = false;
 assert.deepEqual(await request({ kind: "troops" }), {
   kind: "troops",
   id: 13,
+  ready: false,
+});
+playerAlive = true;
+activePlayer = null;
+assert.deepEqual(await request({ kind: "troops" }), {
+  kind: "troops",
+  id: 14,
   ready: false,
 });
 
