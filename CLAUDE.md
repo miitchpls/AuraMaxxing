@@ -146,6 +146,19 @@ compiles only the classes it finds scanning the game's `src/`, and this folder i
 gitignored so it is never scanned: an invented class produces nothing. Grep the
 game's `src/` before using one that is not already here.
 
+## Panel UI
+
+There is one window, `AuraMaxxing`, and every feature is exactly one card inside
+it. A feature calls `addSection({ id, title, body })` from `src/ui/panel.js` and
+gets back a remove function for its `disable()`. It never creates a window, and
+never positions, drags, or styles one.
+
+The card is the only box a feature draws. Inside it go plain controls — do not
+wrap groups of them in further bordered boxes, or one feature reads as three.
+
+Two levels of collapse: the panel header hides every card, a card header hides
+its own contents.
+
 ## Automation
 
 Features that act on the user's behalf are individually toggleable and **off by
