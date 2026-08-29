@@ -83,14 +83,32 @@ settable as properties on the `single-player-modal` element before starting:
   exactly like a broken feature.
 - `instantBuild = true` when the test is about issuing builds, not waiting.
 
-Load the extension code by importing the live modules from the dev server —
-`await import("/AuraMaxxing/src/main.js")` — instead of the installed extension.
-This folder sits inside the root Vite serves, so that always runs what is on
-disk, with no reload step. Chrome forbids extensions from touching
-`chrome://` pages, so reloading the installed extension is something only a
-human can do, and a half-reloaded extension silently mixes old and new modules.
-What this path does not exercise is the isolated/page world split, so a change
-to `src/world/gameBridge.js` still needs a real extension reload to trust.
+### Loading the code under test
+
+Chrome forbids extensions from touching `chrome://` pages, so only a human can
+press reload on `chrome://extensions` — and a half-reloaded extension silently
+mixes old and new modules, which reads as a nonsense error (`does not provide an
+export named …`) rather than as a stale cache.
+
+To avoid depending on that, run this **in the page console** when driving the
+browser:
+
+```js
+await import("/AuraMaxxing/src/main.js");
+```
+
+This folder sits inside the root Vite serves, so it loads whatever is on disk
+right now, with no reload step.
+
+This is a test command only. It is never committed and never referenced by the
+extension: `content.js` loads the same module graph from the extension's own
+origin with `import(chrome.runtime.getURL("src/main.js"))`, and that is the real
+path in production. The console command exists so a test does not depend on a
+human clicking reload.
+
+What it does not exercise is the isolated/page world split — it runs entirely in
+the page world. A change to `src/world/gameBridge.js` or to `api/game.js` is only
+trustworthy after a real extension reload, so ask for one.
 
 Always read the page console after a test run. A module that fails to load, or a
 feature that threw on enable, shows up there and nowhere else.
