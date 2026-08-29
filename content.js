@@ -8,7 +8,7 @@ if (!document.getElementById(PANEL_ID)) {
   panel.id = PANEL_ID;
   panel.className =
     "fixed z-900 flex flex-col p-2 bg-gray-800/92 backdrop-blur-sm shadow-xs rounded-lg text-white select-none";
-  panel.style.cssText = "left:0;top:0;width:220px;";
+  panel.style.cssText = "left:16px;top:0;width:220px;";
   panel.innerHTML = `
     <div class="flex items-center gap-2 text-sm" style="cursor:move" data-drag>
       <span>AuraMaxxing</span>
@@ -22,8 +22,7 @@ if (!document.getElementById(PANEL_ID)) {
     </div>`;
   document.body.appendChild(panel);
 
-  // right edge, vertically centered — measured after layout so dragging stays plain px math
-  panel.style.left = `${window.innerWidth - panel.offsetWidth - 16}px`;
+  // vertical center, measured after layout so dragging stays plain px math
   panel.style.top = `${(window.innerHeight - panel.offsetHeight) / 2}px`;
 
   const body = panel.querySelector("[data-body]");
