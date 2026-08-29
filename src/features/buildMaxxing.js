@@ -1,9 +1,11 @@
 import {
   BUILD_ACTIONS,
+  DRAG_THRESHOLD_PX,
   confirmBuild,
   pinCursor,
   pressBuildKey,
   pressEscape,
+  releasePointer,
 } from "../api/input.js";
 import { inspect } from "../api/game.js";
 import { addSection } from "../ui/panel.js";
@@ -86,26 +88,53 @@ const waitUntilAffordable = async (point, action, size, signal) => {
   return { blocked: "cancelled" };
 };
 
+// Resolves on a click, never on a drag: a press-and-drag has to reach the game
+// so the map still pans while we are waiting for the target.
 const captureNextClick = (signal) =>
   new Promise((resolve, reject) => {
-    const swallow = (event) => {
+    let startX = 0;
+    let startY = 0;
+
+    const onDown = (event) => {
+      startX = event.clientX;
+      startY = event.clientY;
+    };
+
+    const onUp = (event) => {
+      const moved =
+        Math.abs(event.clientX - startX) + Math.abs(event.clientY - startY);
+      if (moved >= DRAG_THRESHOLD_PX) return;
+
       event.preventDefault();
       event.stopPropagation();
+      window.addEventListener(
+        "click",
+        (click) => {
+          click.preventDefault();
+          click.stopPropagation();
+        },
+        { capture: true, once: true },
+      );
+      stop();
+      releasePointer(event.pointerId, startX, startY);
+      resolve({ x: event.clientX, y: event.clientY });
     };
-    signal.addEventListener("abort", () => reject(signal.reason), {
-      once: true,
-    });
-    window.addEventListener(
-      "pointerdown",
-      (event) => {
-        swallow(event);
-        for (const type of ["pointerup", "click"]) {
-          window.addEventListener(type, swallow, { capture: true, once: true });
-        }
-        resolve({ x: event.clientX, y: event.clientY });
+
+    const stop = () => {
+      window.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("pointerup", onUp, true);
+    };
+
+    signal.addEventListener(
+      "abort",
+      () => {
+        stop();
+        reject(signal.reason);
       },
-      { capture: true, once: true, signal },
+      { once: true },
     );
+    window.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("pointerup", onUp, true);
   });
 
 const buildBody = () => {
@@ -199,7 +228,7 @@ export default {
       }
       start(body);
     });
-    removeSection = addSection({ id: "buildmaxxing", title: "buildMaxxing", body });
+    removeSection = addSection({ id: "buildmaxxing", title: "BuildMaxxing", body });
   },
 
   disable() {

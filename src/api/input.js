@@ -77,3 +77,23 @@ export const pinCursor = (x, y) => {
   send();
   return () => window.removeEventListener("mousemove", onRealMove, true);
 };
+
+// The game reads a pointerup further than this from the press as a drag and
+// skips the click action, while still clearing its pointer state.
+export const DRAG_THRESHOLD_PX = 10;
+
+// Ends a press the game must not act on. Simply swallowing the real pointerup
+// would leave the game believing the button is still down, which makes the map
+// pan on a bare mouse move; replaying it far away reads as a drag instead.
+export const releasePointer = (pointerId, x, y) =>
+  window.dispatchEvent(
+    new PointerEvent("pointerup", {
+      clientX: x + DRAG_THRESHOLD_PX * 10,
+      clientY: y,
+      pointerId,
+      pointerType: "mouse",
+      button: 0,
+      buttons: 0,
+      bubbles: true,
+    }),
+  );
