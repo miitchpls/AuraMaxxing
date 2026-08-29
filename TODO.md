@@ -63,3 +63,12 @@ attacking with 70% is not sustainable, because it drops you off the curve.
 
 Could be automatic attacking, or purely visual indicators showing the same
 information and leaving the attack to you.
+
+## Threat warnings
+
+Something that warns you about dangers, lighting up indicators as they build up.
+
+Example: you hold a dense cluster of structures behind a level 5 SAM, and there
+is a player in the game with at least 6 missile silos, so they can punch through
+it — medium warning. If that player then gets close to the gold needed to fire
+enough bombs, the danger level rises.
