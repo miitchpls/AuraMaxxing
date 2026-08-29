@@ -22,3 +22,9 @@ and how many bombs are needed to breach.
 Players send sleeping cells: at the start of a game they click somewhere far
 away and land a single troop there, keeping a hidden pocket of territory. This
 warns you when a sleeping cell is sitting near you.
+
+## HippieMaxxing
+
+An on/off toggle. Turning it on sends an alliance request to everyone, and while
+it stays on it keeps accepting alliance renewal requests and sending them out to
+other players.
