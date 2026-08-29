@@ -2,7 +2,7 @@
 
 Ideas not yet built. Sketches, not decisions.
 
-## Build safeguard
+## CovidMaxxing
 
 An on/off toggle. While on, it refuses to place structures too close to each
 other, keeping at least the blast radius of the small nuke plus some margin
@@ -29,7 +29,7 @@ An on/off toggle. Turning it on sends an alliance request to everyone, and while
 it stays on it keeps accepting alliance renewal requests and sending them out to
 other players.
 
-## Cheap structure loop
+## BrokeMaxxing
 
 Structure prices climb with how many you already own: the first city costs 125k,
 the second 250k, and so on. Losing a structure drops the count, so the next one
@@ -45,7 +45,7 @@ far less gold than paying the rising price.
 It needs a rough model of how the tribe AI decides to attack, and probably
 reading tribe ids out of the game state in the browser.
 
-## Player density heatmap
+## SmartMaxxing
 
 A toggle that shows a heatmap of where players are spread across the map, so at
 the start of a game you can see which areas are crowded and which are empty.
@@ -64,7 +64,7 @@ attacking with 70% is not sustainable, because it drops you off the curve.
 Could be automatic attacking, or purely visual indicators showing the same
 information and leaving the attack to you.
 
-## Threat warnings
+## DEFCONMaxxing
 
 Something that warns you about dangers, lighting up indicators as they build up.
 
@@ -73,14 +73,14 @@ is a player in the game with at least 6 missile silos, so they can punch through
 it — medium warning. If that player then gets close to the gold needed to fire
 enough bombs, the danger level rises.
 
-## Build presets
+## BlueprintMaxxing
 
 A catalogue of building layouts. Each entry shows a picture of the arrangement
 and its price — a small block of cities and factories, for instance. Click one
 and, if there is enough room, it builds the structures according to that preset.
 Presets you cannot currently afford appear disabled.
 
-## Automatic messages
+## SecretaryMaxxing
 
 Something that fires messages on its own when a condition is met. First one
 could be sending an SOS emoji to allies when you are under attack and low on
