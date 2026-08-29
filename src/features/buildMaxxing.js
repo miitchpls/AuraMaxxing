@@ -23,6 +23,9 @@ const LABELS = {
 };
 
 const BATCH_SIZE = 5;
+const MAXXING_ACTIONS = BUILD_ACTIONS.filter(
+  (action) => BUILDABLES[action].repeatable !== false,
+);
 
 const KEY_DELAY_MS = 100;
 const POLL_INTERVAL_MS = 500;
@@ -263,7 +266,7 @@ const buildBody = () => {
   body.className = "flex flex-col gap-2 text-sm";
   body.innerHTML = `
     <select class="w-full px-1 py-1 bg-gray-700/50 border border-slate-500 rounded-md text-white" data-entity>
-      ${BUILD_ACTIONS.map(
+      ${MAXXING_ACTIONS.map(
         (action) => `<option value="${action}">${LABELS[action]}</option>`,
       ).join("")}
     </select>
