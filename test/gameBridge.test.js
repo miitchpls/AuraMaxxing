@@ -19,6 +19,7 @@ let screenWorld = { x: 1, y: 1 };
 let projectOffset = 0;
 let lastRef = null;
 let allianceInteraction = { canSendAllianceRequest: true };
+let allianceInteractionCalls = 0;
 const emitted = [];
 class SendAllianceRequestIntentEvent {
   constructor(requestor, recipient) {
@@ -43,9 +44,24 @@ const eventBus = {
 };
 const other = {
   id: () => "other-player",
+  type: () => "HUMAN",
   isAlive: () => true,
   isDisconnected: () => false,
   nameLocation: () => ({ x: 2, y: 2 }),
+};
+const bot = {
+  id: () => "bot-player",
+  type: () => "BOT",
+  isAlive: () => true,
+  isDisconnected: () => false,
+  nameLocation: () => ({ x: 3, y: 3 }),
+};
+const nation = {
+  id: () => "nation-player",
+  type: () => "NATION",
+  isAlive: () => true,
+  isDisconnected: () => false,
+  nameLocation: () => ({ x: 4, y: 4 }),
 };
 const player = {
   buildables: async () => buildables,
@@ -58,17 +74,21 @@ const player = {
   isRequestingAllianceWith: () => false,
   isAlliedWith: () => false,
   alliances: () => [],
-  actions: async () => ({ interaction: allianceInteraction }),
+  actions: async () => {
+    allianceInteractionCalls++;
+    return { interaction: allianceInteraction };
+  },
 };
 const game = {
   myPlayer: () => player,
-  players: () => [player, other],
+  players: () => [player, other, bot, nation],
   isValidCoord: () => true,
   ref: (x, y) => {
     lastRef = { x, y };
     return { x, y };
   },
-  owner: ({ x, y }) => (x === 2 && y === 2 ? other : player),
+  owner: ({ x, y }) =>
+    x === 2 && y === 2 ? other : x === 4 && y === 4 ? nation : player,
 };
 const transformHandler = {
   screenToWorldCoordinates: () => screenWorld,
@@ -193,8 +213,12 @@ assert.deepEqual(await request({ kind: "allianceState" }), {
   kind: "allianceState",
   id: 7,
   ready: true,
-  actions: [{ type: "request", recipient: "other-player" }],
+  actions: [
+    { type: "request", recipient: "other-player" },
+    { type: "request", recipient: "nation-player" },
+  ],
 });
+assert.equal(allianceInteractionCalls, 2);
 
 assert.deepEqual(
   await request({

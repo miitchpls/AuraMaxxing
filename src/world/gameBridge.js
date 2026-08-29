@@ -1,5 +1,6 @@
 const REQUEST = "auramaxxing:game-request";
 const RESPONSE = "auramaxxing:game-response";
+const ALLIANCE_PLAYER_TYPES = new Set(["HUMAN", "NATION"]);
 
 // Replies name the request they answer: a page can briefly hold two bridges (an
 // installed extension plus a freshly loaded one), and both would answer the same
@@ -186,6 +187,7 @@ const allianceState = async ({ id }) => {
       const allied = player.isAlliedWith(other);
       return (
         other !== player &&
+        ALLIANCE_PLAYER_TYPES.has(other.type?.()) &&
         other.isAlive() &&
         !other.isDisconnected() &&
         (!player.isFriendly(other) || allied) &&
@@ -233,7 +235,11 @@ const allianceAction = async ({ id, action, recipient, token }) => {
 
   const { game, eventBus, player, requestType, extensionType } = context;
   const other = game.players().find((candidate) => candidate.id() === recipient);
-  if (!other || other === player) {
+  if (
+    !other ||
+    other === player ||
+    !ALLIANCE_PLAYER_TYPES.has(other.type?.())
+  ) {
     return reply({ kind: "allianceAction", id, ready: true, sent: false });
   }
 
