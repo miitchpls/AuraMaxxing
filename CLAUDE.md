@@ -17,7 +17,8 @@ when the game changes.
 
 - Never commit to `main` unless explicitly asked.
 - New feature → new branch `feature/<name>`. Commit freely there.
-- Branches stay local until pushing is requested.
+- On a feature branch, push right after every commit (`git push -u origin HEAD`
+  on the first one) so `origin` is never behind. This does not apply to `main`.
 - Any MR touching the UI includes **before and after** screenshots: same screen,
   same resolution, with and without the extension loaded. Non-UI changes need none.
 
