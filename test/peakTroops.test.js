@@ -23,7 +23,6 @@ assert.equal(troopIncreaseRateAt(maxTroops, maxTroops), 0);
 const surplus = peakTroopPlan(60000, maxTroops);
 assert.equal(surplus.attackPercent, 30);
 assert.equal(surplus.targetTroops, target);
-assert.equal(surplus.targetRatio, target / maxTroops);
 assert.ok(60000 * (1 - surplus.attackPercent / 100) >= target);
 assert.ok(60000 * (1 - (surplus.attackPercent + 1) / 100) < target);
 assert.equal(peakTroopPlan(40000, maxTroops).attackPercent, 0);

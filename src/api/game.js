@@ -161,7 +161,6 @@ export const peakTroopPlan = (troops, maxTroops) => {
   const surplusRatio = troops > 0 ? (troops - targetTroops) / troops : 0;
   return {
     targetTroops,
-    targetRatio: targetTroops / maxTroops,
     attackPercent: Math.max(0, Math.floor(surplusRatio * 100)),
   };
 };
