@@ -1,11 +1,19 @@
-import { peakTroopPlan, troopIncreaseRateAt, troopState } from "../api/game.js";
+import {
+  peakTroopPlan,
+  toDisplayedTroops,
+  troopIncreaseRateAt,
+  troopState,
+} from "../api/game.js";
 import { addSection } from "../ui/panel.js";
 
 const REFRESH_MS = 2000;
 const number = new Intl.NumberFormat("en-US", {
   notation: "compact",
-  maximumFractionDigits: 1,
+  maximumSignificantDigits: 3,
 });
+
+export const formatTroops = (troops) =>
+  number.format(toDisplayedTroops(troops));
 
 let refreshTimer = null;
 let removeSection = null;
@@ -72,6 +80,7 @@ const render = (body, state) => {
     state.troops,
     plan.targetTroops,
   );
+  const targetTroops = formatTroops(plan.targetTroops);
 
   body.querySelector("[data-status]").classList.add("hidden");
   body.querySelector("[data-live]").classList.remove("hidden");
@@ -82,13 +91,13 @@ const render = (body, state) => {
   );
   body.querySelector("[data-marker]").style.left = `${gaugePosition}%`;
   body.querySelector("[data-target]").textContent =
-    `Peak: ${number.format(plan.targetTroops)} troops`;
+    `Peak: ${targetTroops} troops`;
   body.querySelector("[data-advice]").textContent =
     plan.attackPercent > 0
       ? `Attack up to ${plan.attackPercent}% now`
       : state.troops < plan.targetTroops
-        ? `Hold until ${number.format(plan.targetTroops)} troops`
-        : `Keep at least ${number.format(plan.targetTroops)} troops`;
+        ? `Hold until ${targetTroops} troops`
+        : `Keep at least ${targetTroops} troops`;
 };
 
 const refresh = async (body, currentSession) => {

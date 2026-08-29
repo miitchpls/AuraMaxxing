@@ -3,9 +3,13 @@ import assert from "node:assert/strict";
 import {
   peakTroopPlan,
   peakTroopTarget,
+  toDisplayedTroops,
   troopIncreaseRateAt,
 } from "../src/api/game.js";
-import { peakGaugePosition } from "../src/features/peakMaxxing.js";
+import {
+  formatTroops,
+  peakGaugePosition,
+} from "../src/features/peakMaxxing.js";
 
 const maxTroops = 100000;
 const target = peakTroopTarget(maxTroops);
@@ -35,5 +39,8 @@ assert.equal(peakGaugePosition(0.92, 60000, 50000), 54);
 assert.equal(peakGaugePosition(1, 50000, 50000), 50);
 assert.equal(peakGaugePosition(0, 40000, 50000), 0);
 assert.equal(peakGaugePosition(0, 60000, 50000), 100);
+
+assert.equal(toDisplayedTroops(85900), 8590);
+assert.equal(formatTroops(85900), "8.59K");
 
 console.log("peakTroops ok");

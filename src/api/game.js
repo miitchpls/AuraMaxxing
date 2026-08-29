@@ -131,6 +131,8 @@ export const quote = async (action, count) => {
 const TROOP_EXPONENT = 0.73;
 const TROOP_CURVE_ITERATIONS = 80;
 
+export const toDisplayedTroops = (troops) => troops / 10;
+
 export const troopIncreaseRateAt = (troops, maxTroops) => {
   const increase =
     (10 + Math.pow(troops, TROOP_EXPONENT) / 4) * (1 - troops / maxTroops);
