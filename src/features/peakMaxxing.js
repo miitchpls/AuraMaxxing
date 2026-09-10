@@ -6,7 +6,7 @@ import {
 } from "../api/game.js";
 import { addSection } from "../ui/panel.js";
 
-const REFRESH_MS = 2000;
+const REFRESH_MS = 500;
 const number = new Intl.NumberFormat("en-US", {
   notation: "compact",
   maximumSignificantDigits: 3,
@@ -29,17 +29,17 @@ const buildBody = () => {
   const body = document.createElement("div");
   body.className = "text-sm";
   body.innerHTML = `
-    <span data-status>Waiting for a match</span>
-    <div class="hidden" data-live>
+    <span class="hidden" data-status></span>
+    <div data-live>
       <div class="flex items-center gap-2">
-        <span>Peak generation</span>
+        <span title="Current troop growth as a percentage of maximum growth">Growth / max</span>
         <strong class="ml-auto" data-generation></strong>
       </div>
       <div
         class="mt-2"
         data-gauge
         role="meter"
-        aria-label="Peak generation"
+        aria-label="Troop growth as a percentage of maximum growth"
         aria-valuemin="0"
         aria-valuemax="100"
         style="position:relative;height:10px;border-radius:9999px;background:linear-gradient(to right,#dc2626 0%,#eab308 25%,#22c55e 45%,#22c55e 55%,#eab308 75%,#dc2626 100%)"
@@ -49,7 +49,7 @@ const buildBody = () => {
           style="position:absolute;left:50%;top:-3px;width:3px;height:16px;border-radius:2px;background:white;box-shadow:0 0 0 1px rgb(0 0 0 / 75%);transform:translateX(-50%);transition:left 200ms ease-out"
         ></span>
       </div>
-      <div class="text-xs text-slate-400 text-center">100%</div>
+      <div class="text-xs text-slate-400 text-center">Max growth</div>
       <div class="mt-1" data-target></div>
     </div>`;
   return body;
@@ -73,7 +73,7 @@ const render = (body, state) => {
     0,
     Math.min(1, state.increasePerSecond / peakRate),
   );
-  const generationPercent = Math.round(rateRatio * 100);
+  const generationPercent = (rateRatio * 100).toFixed(1);
   const gaugePosition = peakGaugePosition(
     rateRatio,
     state.troops,
@@ -90,7 +90,7 @@ const render = (body, state) => {
   );
   body.querySelector("[data-marker]").style.left = `${gaugePosition}%`;
   body.querySelector("[data-target]").textContent =
-    `Peak: ${targetTroops} troops`;
+    `Max growth at: ${targetTroops} troops`;
 };
 
 const refresh = async (body, currentSession) => {
@@ -99,8 +99,7 @@ const refresh = async (body, currentSession) => {
   try {
     const state = await troopState();
     if (session !== currentSession) return;
-    if (!state.ready) clearBody(body, "Waiting for a match");
-    else render(body, state);
+    if (state.ready) render(body, state);
   } catch {
     if (session === currentSession) clearBody(body, "Troop curve unavailable");
   } finally {

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AuraMaxxing",
-  "version": "0.2.0",
+  "version": "3.1",
   "description": "Extra features for OpenFront.",
   "content_scripts": [
     {
