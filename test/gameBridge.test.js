@@ -68,8 +68,9 @@ const player = {
   units: () => ownedUnits,
   gold: () => 4000000n,
   readyMissileCount: () => 4,
+  troops: () => 60000,
   id: () => "my-player",
-  isAlive: () => true,
+  isAlive: () => playerAlive,
   isFriendly: () => false,
   isRequestingAllianceWith: () => false,
   isAlliedWith: () => false,
@@ -79,8 +80,14 @@ const player = {
     return { interaction: allianceInteraction };
   },
 };
+let playerAlive = true;
+let activePlayer = player;
 const game = {
-  myPlayer: () => player,
+  myPlayer: () => activePlayer,
+  config: () => ({
+    maxTroops: () => 100000,
+    troopIncreaseRate: () => 321.5,
+  }),
   players: () => [player, other, bot, nation],
   isValidCoord: () => true,
   ref: (x, y) => {
@@ -271,5 +278,27 @@ assert.deepEqual(await cancelledAction, {
   sent: false,
 });
 assert.equal(emitted.length, 2);
+
+assert.deepEqual(await request({ kind: "troops" }), {
+  kind: "troops",
+  id: 12,
+  ready: true,
+  troops: 60000,
+  maxTroops: 100000,
+  increasePerSecond: 3215,
+});
+playerAlive = false;
+assert.deepEqual(await request({ kind: "troops" }), {
+  kind: "troops",
+  id: 13,
+  ready: false,
+});
+playerAlive = true;
+activePlayer = null;
+assert.deepEqual(await request({ kind: "troops" }), {
+  kind: "troops",
+  id: 14,
+  ready: false,
+});
 
 console.log("gameBridge ok");

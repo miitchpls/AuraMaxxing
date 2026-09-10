@@ -1,4 +1,4 @@
-import { host } from "../api/dom.js";
+import { host, inMatch, onMatchChange } from "../api/dom.js";
 
 const PANEL_ID = "auramaxxing-panel";
 const MARGIN_PX = 16;
@@ -41,14 +41,34 @@ const makeDraggable = (element, handle) => {
   });
 };
 
-const makeToggle = (button, target) =>
+const setCollapsed = (button, target, collapsed) => {
+  target.classList.toggle("hidden", collapsed);
+  button.innerHTML = collapsed ? "&plus;" : "&minus;";
+  button.setAttribute("aria-expanded", String(!collapsed));
+};
+
+const toggles = new Map();
+
+const updateToggles = (active) => {
+  for (const [button, target] of toggles) {
+    button.disabled = !active;
+    if (!active) setCollapsed(button, target, true);
+  }
+};
+
+const makeToggle = (button, target) => {
+  toggles.set(button, target);
+  setCollapsed(button, target, target.classList.contains("hidden"));
+  updateToggles(inMatch());
   button.addEventListener("click", () => {
-    const collapsed = target.classList.toggle("hidden");
-    button.innerHTML = collapsed ? "&plus;" : "&minus;";
+    if (!inMatch()) return;
+    setCollapsed(button, target, !target.classList.contains("hidden"));
   });
+};
 
 let panel = null;
 let sections = null;
+let stopMatchChange = null;
 
 const createShell = () => {
   panel = document.createElement("div");
@@ -67,6 +87,7 @@ const createShell = () => {
   panel.style.top = `${(window.innerHeight - panel.offsetHeight) / 2}px`;
   makeDraggable(panel, panel.querySelector("[data-drag]"));
   makeToggle(panel.querySelector("[data-collapse]"), sections);
+  stopMatchChange = onMatchChange(updateToggles);
 };
 
 export const addSection = ({ id, title, body }) => {
@@ -83,11 +104,16 @@ export const addSection = ({ id, title, body }) => {
   body.classList.add("mt-2", "hidden");
   section.appendChild(body);
   sections.appendChild(section);
-  makeToggle(section.querySelector("[data-collapse]"), body);
+  const toggle = section.querySelector("[data-collapse]");
+  makeToggle(toggle, body);
 
   return () => {
+    toggles.delete(toggle);
     section.remove();
     if (sections.children.length === 0) {
+      stopMatchChange();
+      stopMatchChange = null;
+      toggles.clear();
       panel.remove();
       panel = null;
       sections = null;

@@ -6,17 +6,37 @@ const now = 1_000_000;
 assert.equal(nextSlotDelay([], now), 0);
 assert.equal(nextSlotDelay([now - 900, now - 800], now), 0);
 
-// Five in the last second is the per-second budget: wait out the oldest.
-const burst = [now - 900, now - 800, now - 700, now - 600, now - 500];
+const burst = Array.from({ length: 10 }, (_, i) => now - 900 + i * 90);
+assert.equal(nextSlotDelay(burst.slice(0, 9), now), 0);
 assert.equal(nextSlotDelay(burst, now), 100);
+assert.equal(nextSlotDelay(burst, now + 100), 0);
 
 // Spread over the minute, the per-second budget is free again.
-const spread = Array.from({ length: 99 }, (_, i) => now - 59_000 + i * 500);
+const spread = Array.from({ length: 149 }, (_, i) => now - 59_000 + i * 380);
 assert.equal(nextSlotDelay(spread, now), 0);
 
-// One hundred in the minute is the per-minute budget.
-const full = Array.from({ length: 100 }, (_, i) => now - 59_000 + i * 500);
+const full = Array.from({ length: 150 }, (_, i) => now - 59_000 + i * 380);
 assert.equal(nextSlotDelay(full, now), 1000);
+assert.equal(nextSlotDelay(full.slice(1), now + 1000), 0);
+
+const sent = [];
+let clock = 0;
+for (let i = 0; i < 300; i++) {
+  let delay;
+  do {
+    while (sent.length > 0 && clock - sent[0] >= 60_000) sent.shift();
+    delay = nextSlotDelay(sent, clock);
+    clock += delay;
+  } while (delay > 0);
+  sent.push(clock);
+  assert.ok(sent.filter((time) => clock - time < 1000).length <= 10);
+  assert.ok(sent.length <= 150);
+  if (i === 9) assert.equal(clock, 0);
+  if (i === 10) assert.equal(clock, 1000);
+  if (i === 149) assert.equal(clock, 14_000);
+  if (i === 150) assert.equal(clock, 60_000);
+}
+assert.equal(clock, 74_000);
 
 const priority = ["secretaryMaxxing", "buildMaxxing"];
 

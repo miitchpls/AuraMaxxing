@@ -1,13 +1,9 @@
-// The one way out to the server. Everything that reaches it queues here, so
-// several features running at once cannot exceed the limits between them.
-//
-// The server drops intents past 10 per second or 150 per minute, silently: the
-// action simply never happened, with no error and no retry. These budgets stay
-// under that, because the same allowance also carries the player's own moves.
+// The server silently drops excess intents. Features share its full budget;
+// manual actions bypass this queue and can still push the total over the limit.
 import { sendAllianceAction } from "./game.js";
 
-const BUDGET_PER_SECOND = 5;
-const BUDGET_PER_MINUTE = 100;
+const BUDGET_PER_SECOND = 10;
+const BUDGET_PER_MINUTE = 150;
 const SECOND_MS = 1000;
 const MINUTE_MS = 60000;
 

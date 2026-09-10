@@ -1,4 +1,5 @@
 const LEFT_SIDEBAR = "game-left-sidebar";
+const IN_GAME_CLASS = "in-game";
 const AD_CONTAINERS = [
   "#adBanner",
   "#pw-oop-flex_container",
@@ -12,6 +13,20 @@ const AD_CONTAINERS = [
 export const available = () => document.querySelector(LEFT_SIDEBAR) !== null;
 
 export const host = () => document.body;
+
+export const inMatch = () => document.body.classList.contains(IN_GAME_CLASS);
+
+export const onMatchChange = (listener) => {
+  let previous = inMatch();
+  const observer = new MutationObserver(() => {
+    const current = inMatch();
+    if (current === previous) return;
+    previous = current;
+    listener(current);
+  });
+  observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+  return () => observer.disconnect();
+};
 
 export const adContainers = () => {
   const matches = [...document.querySelectorAll(AD_CONTAINERS)];

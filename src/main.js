@@ -5,9 +5,10 @@ import * as intents from "./api/intents.js";
 import adMaxxing from "./features/adMaxxing.js";
 import buildMaxxing from "./features/buildMaxxing.js";
 import hippieMaxxing from "./features/hippieMaxxing.js";
+import peakMaxxing from "./features/peakMaxxing.js";
 
 const api = { dom, game, input, intents };
-const features = [buildMaxxing, hippieMaxxing, adMaxxing];
+const features = [buildMaxxing, hippieMaxxing, peakMaxxing, adMaxxing];
 
 for (const feature of features) {
   const missing = feature.requires.filter((name) => !api[name].available());

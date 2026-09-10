@@ -116,6 +116,32 @@ const quote = async ({ id, unitType, count }) => {
   });
 };
 
+const troops = async ({ id }) => {
+  const element = document.querySelector("build-menu");
+  const game = element?.game;
+  const player = game?.myPlayer?.();
+  const config = game?.config?.();
+  if (!player?.isAlive() || !config) {
+    return reply({ kind: "troops", id, ready: false });
+  }
+
+  const current = player.troops();
+  const max = config.maxTroops(player);
+  const increasePerSecond = config.troopIncreaseRate(player) * 10;
+  if (![current, max, increasePerSecond].every(Number.isFinite) || max <= 0) {
+    return reply({ kind: "troops", id, ready: false });
+  }
+
+  reply({
+    kind: "troops",
+    id,
+    ready: true,
+    troops: current,
+    maxTroops: max,
+    increasePerSecond,
+  });
+};
+
 // The extension cannot import constructors from the game's bundle, but the bus
 // keeps the exact runtime constructor identities registered by its transport.
 const findEventType = (eventBus, constructorName, transportHandler) => {
@@ -261,6 +287,7 @@ const allianceAction = async ({ id, action, recipient, token }) => {
 const handlers = {
   quote,
   project,
+  troops,
   allianceState,
   allianceAction,
   allianceCancel,
