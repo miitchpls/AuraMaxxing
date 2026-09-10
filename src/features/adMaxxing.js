@@ -1,9 +1,7 @@
 import { adContainers } from "../api/dom.js";
-import { addSection } from "../ui/panel.js";
 
 const SCAN_INTERVAL_MS = 1000;
 
-let removeSection = null;
 let scanTimer = null;
 const detached = new Map();
 
@@ -41,39 +39,11 @@ const stop = () => {
   restoreAds();
 };
 
-const buildBody = () => {
-  const body = document.createElement("div");
-  body.className = "text-sm";
-  body.innerHTML = `
-    <label class="flex items-center gap-2">
-      <input type="checkbox" data-toggle checked />
-      <span>Hide advertisements</span>
-    </label>`;
-  return body;
-};
-
 export default {
   id: "adMaxxing",
   name: "AdMaxxing",
   requires: ["dom"],
 
-  enable() {
-    const body = buildBody();
-    body.querySelector("[data-toggle]").addEventListener("change", (event) => {
-      if (event.currentTarget.checked) start();
-      else stop();
-    });
-    removeSection = addSection({
-      id: "admaxxing",
-      title: "AdMaxxing",
-      body,
-    });
-    start();
-  },
-
-  disable() {
-    stop();
-    removeSection?.();
-    removeSection = null;
-  },
+  enable: start,
+  disable: stop,
 };
