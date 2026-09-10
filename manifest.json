@@ -21,5 +21,15 @@
       "resources": ["src/*"],
       "matches": ["https://*.openfront.io/*", "http://localhost/*"]
     }
-  ]
+  ],
+  "permissions": ["declarativeNetRequest"],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "auramaxxing-admiral",
+        "enabled": true,
+        "path": "src/api/admiralRules.json"
+      }
+    ]
+  }
 }
