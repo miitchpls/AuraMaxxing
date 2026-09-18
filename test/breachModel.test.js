@@ -1,0 +1,102 @@
+import assert from "node:assert/strict";
+import {
+  calculate,
+  makeSalvo,
+  simulate,
+  trajectory,
+} from "../src/api/breachModel.js";
+
+const snapshot = {
+  rules: {
+    width: 1200,
+    height: 800,
+    msPerTick: 100,
+    nukeSpeed: 10,
+    targetableRange: 150,
+    siloCooldown: 90,
+    samCooldown: 90,
+    samSpeed: 12,
+    maxSamRange: 150,
+    structureSpacing: 16,
+  },
+  target: { x: 800, y: 400 },
+  silos: [50, 51].map((level, i) => ({
+    id: i + 1,
+    x: 200,
+    y: 400 + 12 * i,
+    level,
+    queue: [],
+  })),
+  sams: [
+    { id: 3, x: 800, y: 400, level: 100, range: 150 - 480 / 105, queue: [] },
+  ],
+};
+const run = (s, count, gap = 1) =>
+  simulate(s, makeSalvo(s, s.silos, count, gap));
+assert.equal(run(snapshot, 101).breached, false);
+assert.equal(run(snapshot, 101, 0).breached, true);
+assert.equal(
+  run({ ...snapshot, silos: [{ ...snapshot.silos[0], level: 101 }] }, 101)
+    .breached,
+  false,
+);
+assert.equal(
+  run(
+    { ...snapshot, silos: snapshot.silos.map((s) => ({ ...s, x: 600 })) },
+    101,
+  ).breached,
+  true,
+);
+assert.equal(run({ ...snapshot, sams: [] }, 1).breached, true);
+assert.equal(
+  run(
+    {
+      ...snapshot,
+      sams: [
+        snapshot.sams[0],
+        { id: 4, x: 820, y: 400, level: 1, range: 70, queue: [] },
+      ],
+    },
+    101,
+    0,
+  ).breached,
+  false,
+);
+assert.equal(
+  run(
+    {
+      ...snapshot,
+      sams: [
+        snapshot.sams[0],
+        { id: 4, x: 1000, y: 400, level: 1, range: 70, queue: [] },
+      ],
+    },
+    101,
+    0,
+  ).breached,
+  true,
+);
+const salvo = makeSalvo(snapshot, snapshot.silos, 101);
+assert.equal(salvo[0].firstMotion, 3);
+assert.equal(salvo[50].firstMotion, 13);
+assert.equal(salvo.at(-1).firstMotion, 63);
+const path = trajectory(snapshot.silos[0], snapshot.target, snapshot.rules);
+assert.deepEqual({ x: path[0].x, y: path[0].y }, { x: 200, y: 400 });
+assert.deepEqual({ x: path.at(-1).x, y: path.at(-1).y }, snapshot.target);
+assert.ok(path.some((p) => !p.targetable));
+assert.ok(
+  trajectory({ x: 1, y: 1 }, { x: 1199, y: 1 }, snapshot.rules).every(
+    (p) => p.y >= 0,
+  ),
+);
+const result = await calculate(snapshot);
+assert.equal(result.current.breached, false);
+assert.equal(result.recommendations[0].plan, null);
+assert.deepEqual(result.recommendations[1].plan.levels, [52, 51]);
+assert.deepEqual(result.recommendations[2].plan.levels, [34, 34, 33]);
+assert.equal(result.recommendations[2].plan.orderSeconds, 2);
+assert.equal((await calculate({ ...snapshot, silos: [] })).status, "no-silos");
+await assert.rejects(calculate(snapshot, { signal: AbortSignal.abort() }), {
+  name: "AbortError",
+});
+console.log("breachModel ok");

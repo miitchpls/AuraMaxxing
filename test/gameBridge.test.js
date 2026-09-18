@@ -273,3 +273,54 @@ assert.deepEqual(await cancelledAction, {
 assert.equal(emitted.length, 2);
 
 console.log("gameBridge ok");
+
+const rules = {
+  nukeSpeed: () => 10,
+  SAMCooldown: () => 90,
+  SiloCooldown: () => 90,
+  samRange: (l) => 150 - 480 / (l + 5),
+  maxSamRange: () => 150,
+  defaultSamMissileSpeed: () => 12,
+  defaultNukeTargetableRange: () => 150,
+  msPerTick: () => 100,
+  structureMinDist: () => 15,
+  samUpgradeDuration: () => 45,
+};
+const unit = (id, level, friendly = false, underConstruction = false) => ({
+  id: () => id,
+  level: () => level,
+  tile: () => ({ x: 100 + id, y: 200 }),
+  isActive: () => true,
+  isUnderConstruction: () => underConstruction,
+  missileTimerQueue: () => [95],
+  owner: () => ({ isFriendly: () => friendly }),
+  state: { samUpgradeStartTick: null },
+});
+Object.assign(game, {
+  config: () => rules,
+  ticks: () => 100,
+  x: (t) => t.x,
+  y: (t) => t.y,
+  height: () => 800,
+  width: () => 1200,
+  hasOwner: () => false,
+  units: (type) =>
+    type === "SAM Launcher"
+      ? [unit(1, 100), unit(2, 50, true), unit(3, 10, false, true)]
+      : [],
+});
+ownedUnits = [unit(4, 51)];
+const breach = await request({ kind: "breachState", worldX: 800, worldY: 400 });
+assert.equal(breach.ready, true);
+assert.equal(breach.valid, true);
+assert.deepEqual(breach.target, { x: 800, y: 400 });
+assert.equal(breach.sams.length, 1);
+assert.deepEqual(breach.sams[0].queue, [-5]);
+assert.equal(breach.silos[0].level, 51);
+assert.equal(breach.rules.samCooldown, 90);
+assert.equal(emitted.length, 2);
+rules.SAMCooldown = undefined;
+assert.equal(
+  (await request({ kind: "breachState", worldX: 800, worldY: 400 })).ready,
+  false,
+);

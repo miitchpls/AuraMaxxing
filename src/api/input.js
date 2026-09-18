@@ -1,5 +1,5 @@
 import { BUILDABLES } from "./buildables.js";
-import { available as settingsAvailable, keybinds } from "./settings.js";
+import { keybinds, available as settingsAvailable } from "./settings.js";
 
 export const available = () => settingsAvailable();
 
@@ -92,3 +92,52 @@ export const releasePointer = (pointerId, x, y) =>
       bubbles: true,
     }),
   );
+
+export const pickMapPoint = ({ signal, exclude }) =>
+  new Promise((resolve) => {
+    let down = null;
+    let finishing = false;
+    const finish = (point) => {
+      finishing = true;
+      window.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("pointerup", onUp, true);
+      window.removeEventListener("keydown", onKey, true);
+      signal?.removeEventListener("abort", onAbort);
+      resolve(point);
+    };
+    const onDown = (event) => {
+      if (
+        event.button !== 0 ||
+        (event.target?.tagName !== "CANVAS" &&
+          event.target?.id !== "game-input-overlay") ||
+        exclude?.contains(event.target)
+      )
+        return;
+      down = { x: event.clientX, y: event.clientY, id: event.pointerId };
+      event.stopImmediatePropagation();
+      event.preventDefault();
+    };
+    const onUp = (event) => {
+      if (finishing || !down || event.pointerId !== down.id) return;
+      event.stopImmediatePropagation();
+      event.preventDefault();
+      const point =
+        Math.hypot(event.clientX - down.x, event.clientY - down.y) <=
+        DRAG_THRESHOLD_PX
+          ? { x: event.clientX, y: event.clientY }
+          : null;
+      finish(point);
+    };
+    const onKey = (event) => {
+      if (event.code !== "Escape") return;
+      event.stopImmediatePropagation();
+      finish(null);
+    };
+    const onAbort = () => finish(null);
+    if (signal?.aborted) return finish(null);
+    pressEscape();
+    window.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("pointerup", onUp, true);
+    window.addEventListener("keydown", onKey, true);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });

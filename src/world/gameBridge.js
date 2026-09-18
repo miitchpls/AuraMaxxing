@@ -1,3 +1,4 @@
+const BUILD_MENU = "build-menu";
 const REQUEST = "auramaxxing:game-request";
 const RESPONSE = "auramaxxing:game-response";
 const ALLIANCE_PLAYER_TYPES = new Set(["HUMAN", "NATION"]);
@@ -20,7 +21,7 @@ const inspect = async ({
   usesMissile = false,
   count = 1,
 }) => {
-  const element = document.querySelector("build-menu");
+  const element = document.querySelector(BUILD_MENU);
   const game = element?.game;
   const transform = element?.transformHandler;
   const player = game?.myPlayer?.();
@@ -66,7 +67,7 @@ const inspect = async ({
 };
 
 const project = async ({ id, worldX, worldY }) => {
-  const element = document.querySelector("build-menu");
+  const element = document.querySelector(BUILD_MENU);
   const game = element?.game;
   const transform = element?.transformHandler;
   if (!game || !transform) {
@@ -94,7 +95,7 @@ const project = async ({ id, worldX, worldY }) => {
 // running totals once the player owns one of a type; with none owned it gives
 // just the next price, and the caller projects from there.
 const quote = async ({ id, unitType, count }) => {
-  const element = document.querySelector("build-menu");
+  const element = document.querySelector(BUILD_MENU);
   const player = element?.game?.myPlayer?.();
   if (!player) return reply({ kind: "quote", id, ready: false });
 
@@ -134,7 +135,7 @@ const findEventType = (eventBus, constructorName, transportHandler) => {
 };
 
 const allianceContext = () => {
-  const element = document.querySelector("build-menu");
+  const element = document.querySelector(BUILD_MENU);
   const game = element?.game;
   const eventBus = element?.eventBus;
   const player = game?.myPlayer?.();
@@ -258,7 +259,113 @@ const allianceAction = async ({ id, action, recipient, token }) => {
   reply({ kind: "allianceAction", id, ready: true, sent: false });
 };
 
+const breachState = async ({ id, screenX, screenY, worldX, worldY }) => {
+  const element = document.querySelector(BUILD_MENU);
+  const game = element?.game;
+  const player = game?.myPlayer?.();
+  const config = game?.config?.();
+  const required = [
+    "nukeSpeed",
+    "SAMCooldown",
+    "SiloCooldown",
+    "samRange",
+    "maxSamRange",
+    "defaultSamMissileSpeed",
+    "defaultNukeTargetableRange",
+    "msPerTick",
+    "structureMinDist",
+    "samUpgradeDuration",
+  ];
+  if (
+    !player ||
+    !config ||
+    required.some((name) => typeof config[name] !== "function")
+  ) {
+    return reply({ kind: "breachState", id, ready: false });
+  }
+  const target =
+    Number.isInteger(worldX) && Number.isInteger(worldY)
+      ? { x: worldX, y: worldY }
+      : element.transformHandler?.screenToWorldCoordinates(screenX, screenY);
+  if (!target || !game.isValidCoord(target.x, target.y)) {
+    return reply({ kind: "breachState", id, ready: true, valid: false });
+  }
+  const tick = game.ticks();
+  const serialize = (unit) => ({
+    id: unit.id(),
+    x: game.x(unit.tile()),
+    y: game.y(unit.tile()),
+    level: unit.level(),
+    underConstruction: unit.isUnderConstruction(),
+    queue: unit.missileTimerQueue().map((t) => t - tick),
+  });
+  const sams = game
+    .units("SAM Launcher")
+    .filter(
+      (unit) =>
+        unit.isActive() &&
+        !unit.isUnderConstruction() &&
+        !unit.owner().isFriendly(player),
+    )
+    .map((unit) => {
+      const state = unit.state;
+      const upgrading =
+        state?.samUpgradeStartTick !== null &&
+        state?.samUpgradeStartTick !== undefined;
+      return {
+        ...serialize(unit),
+        range: config.samRange(unit.level()),
+        upgrade: upgrading
+          ? {
+              start: state.samUpgradeStartTick - tick,
+              end: state.samUpgradeStartTick + (state.samUpgradeDuration ?? config.samUpgradeDuration()) - tick,
+              from: state.samUpgradeStartRange,
+            }
+          : null,
+      };
+    });
+  const silos = player
+    .units("Missile Silo")
+    .filter((unit) => unit.isActive())
+    .map(serialize);
+  const targetTile = game.ref(target.x, target.y);
+  const found = await player.buildables(targetTile, ["Atom Bomb"]);
+  const buildable = (Array.isArray(found) ? found : [found])[0];
+  reply({
+    kind: "breachState",
+    id,
+    ready: true,
+    valid: true,
+    tick,
+    target,
+    sams,
+    silos,
+    gold: String(player.gold()),
+    bombCost: buildable ? String(buildable.cost) : null,
+    canLaunch: Boolean(buildable) && buildable.canBuild !== false,
+    friendlyTarget:
+      game.hasOwner(targetTile) &&
+      game.owner(targetTile).isPlayer() &&
+      game.owner(targetTile).isFriendly(player),
+    inFlight: game.units("Atom Bomb", "Hydrogen Bomb", "MIRV", "MIRV Warhead")
+      .length,
+    rules: {
+      height: game.height(),
+      width: game.width(),
+      msPerTick: config.msPerTick(),
+      nukeSpeed: config.nukeSpeed("Atom Bomb"),
+      targetableRange: config.defaultNukeTargetableRange(),
+      samCooldown: config.SAMCooldown(),
+      siloCooldown: config.SiloCooldown(),
+      samSpeed: config.defaultSamMissileSpeed(),
+      maxSamRange: config.maxSamRange(),
+      structureSpacing: config.structureMinDist() + 1,
+    },
+  });
+};
+
 const handlers = {
+  breachState,
   quote,
   project,
   allianceState,

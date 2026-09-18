@@ -71,3 +71,34 @@ assert.deepEqual(
 assert.equal(listeners.has("mousemove"), false);
 
 console.log("input ok");
+
+const { pickMapPoint } = await import("../src/api/input.js");
+const event = (x, y) => ({
+  target: { tagName: "CANVAS" },
+  button: 0,
+  pointerId: 1,
+  clientX: x,
+  clientY: y,
+  stopImmediatePropagation() {},
+  preventDefault() {},
+});
+const picked = pickMapPoint({});
+listeners.get("pointerdown")(event(10, 20));
+listeners.get("pointerup")(event(11, 20));
+assert.deepEqual(await picked, { x: 11, y: 20 });
+assert.equal(listeners.size, 0);
+const controller = new AbortController();
+const cancelled = pickMapPoint({ signal: controller.signal });
+controller.abort();
+assert.equal(await cancelled, null);
+assert.equal(listeners.size, 0);
+
+const overlayPick = pickMapPoint({});
+const overlayEvent = {
+  ...event(40, 50),
+  target: { tagName: "DIV", id: "game-input-overlay" },
+};
+listeners.get("pointerdown")(overlayEvent);
+listeners.get("pointerup")(overlayEvent);
+assert.deepEqual(await overlayPick, { x: 40, y: 50 });
+assert.equal(listeners.size, 0);

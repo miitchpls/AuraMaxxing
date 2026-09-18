@@ -6,8 +6,11 @@ import adMaxxing from "./features/adMaxxing.js";
 import buildMaxxing from "./features/buildMaxxing.js";
 import hippieMaxxing from "./features/hippieMaxxing.js";
 
-const api = { dom, game, input, intents };
-const features = [buildMaxxing, hippieMaxxing, adMaxxing];
+import * as breach from "./api/breachModel.js";
+import breachMaxxing from "./features/breachMaxxing.js";
+
+const api = { dom, game, input, intents, breach };
+const features = [buildMaxxing, breachMaxxing, hippieMaxxing, adMaxxing];
 
 for (const feature of features) {
   const missing = feature.requires.filter((name) => !api[name].available());

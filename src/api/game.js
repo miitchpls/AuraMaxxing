@@ -141,3 +141,8 @@ export const sendAllianceAction = (action, recipient, { signal } = {}) => {
     signal?.removeEventListener("abort", onAbort),
   );
 };
+
+export const breachAt = (x, y) =>
+  ask({ kind: "breachState", screenX: x, screenY: y });
+export const breachWorld = (x, y) =>
+  ask({ kind: "breachState", worldX: x, worldY: y });
