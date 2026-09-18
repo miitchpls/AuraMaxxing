@@ -1,29 +1,28 @@
 # BreachMaxxing
 
-Read-only atom-bomb calculator. Select a point, choose the ×5 order cadence and
-arc direction, then recalculate when the battle changes. No builds or launch
-intents are sent.
+Read-only atom-bomb calculator. Select a target to get one sufficient hypothetical
+configuration, its launch direction, positions and timing. Recalculate when the
+positions or levels change. No builds or launch intents are sent.
 
-The calculator snapshots the current game configuration, silo positions and
-ammunition queues, hostile SAM positions, levels, upgrade ranges and independent
-reload timers. It reproduces the fixed-point trajectory, nearest-silo selection,
-per-silo departure spacing and SAM targeting windows. Overlapping SAMs reserve
-targets so the same bomb is not counted twice. A successful SAM reservation is
-assumed to intercept; interference with the interceptor itself is not modeled.
+Both upward and downward arcs are tested automatically. The search prioritizes
+fewer silos, then fewer bombs; an upward arc wins ties. It tests one through five
+fully loaded silos with balanced levels and at most 300 bombs. Layouts start at
+the closest existing silo and extend south at the game's minimum spacing plus
+one tile. Bounds are checked; ownership, terrain and build space need checking.
+No failed layouts or current-ammunition verdicts are displayed.
 
-The result is an estimate assuming all orders arrive at the selected cadence.
-Server drops, other attacks, new construction, ownership changes and alliance
-changes can invalidate it. Existing missiles in flight are disclosed but excluded.
-A target owned by a friendly player is unsupported. Gold and current launch
-availability are displayed separately from the trajectory result.
+Every hostile SAM starts fully loaded at its level's full range, regardless of
+its current reload or upgrade progress. SAMs still reload during the simulated
+salvo: assuming full initial ammo does not disable their normal recovery.
+The fixed-point trajectories, nearest-silo selection, per-silo departure spacing
+and SAM targeting windows follow the game. Overlapping SAMs reserve targets to
+avoid counting a bomb twice. A reserved interception is assumed successful.
 
-The layout search tests one through five fully loaded silos, balanced levels,
-and at most 300 bombs. It starts at the closest existing silo and places the
-others south of it at the game's minimum structure spacing plus one tile. Map
-bounds are checked; ownership, terrain and build space still need checking.
-The displayed minimum is only within that layout family and search bound.
-It is not a global minimum across arbitrary positions. A failed bounded search
-does not imply the target can never be breached.
+The plan uses one ×5 order per tick (currently 100 ms) and assumes every order is
+accepted. Existing missiles, other attacks, new construction and alliance changes
+are excluded. The minimum is within the tested layout family, not across all
+possible positions. Failure within the search bound does not mean no breach is
+possible.
 
 ## Verification
 
@@ -45,8 +44,7 @@ isolated-world boundary. A real extension reload is required for that last check
 
 ## Screenshots
 
-Same local fixture and 1400 × 1000 viewport. The startup launch restriction is
-shown separately from the calculated breach estimate. The three units remain
+Same local fixture and 1400 × 1000 viewport. The three units remain
 unchanged after selecting the target; the extension logs no runtime errors.
 
 ![Without AuraMaxxing](images/breach-before.png)

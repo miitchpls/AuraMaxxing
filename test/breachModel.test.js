@@ -90,11 +90,25 @@ assert.ok(
   ),
 );
 const result = await calculate(snapshot);
-assert.equal(result.current.breached, false);
-assert.equal(result.recommendations[0].plan, null);
-assert.deepEqual(result.recommendations[1].plan.levels, [52, 51]);
-assert.deepEqual(result.recommendations[2].plan.levels, [34, 34, 33]);
-assert.equal(result.recommendations[2].plan.orderSeconds, 2);
+assert.deepEqual(result.plan.levels, [52, 51]);
+assert.equal(result.plan.bombs, 103);
+assert.equal(result.plan.orderSeconds, 2);
+const depleted = {
+  ...snapshot,
+  sams: snapshot.sams.map((s) => ({
+    ...s,
+    queue: Array(100).fill(0),
+    upgrade: { start: 0, end: 45, from: 70 },
+  })),
+};
+assert.deepEqual(await calculate(depleted), result);
+assert.equal(depleted.sams[0].queue.length, 100);
+const arcChoice = await calculate({
+  ...snapshot,
+  sams: [{ id: 4, x: 300, y: 300, level: 1, range: 70, queue: [] }],
+});
+assert.equal(arcChoice.plan.bombs, 1);
+assert.equal(arcChoice.plan.directionUp, false);
 assert.equal((await calculate({ ...snapshot, silos: [] })).status, "no-silos");
 await assert.rejects(calculate(snapshot, { signal: AbortSignal.abort() }), {
   name: "AbortError",

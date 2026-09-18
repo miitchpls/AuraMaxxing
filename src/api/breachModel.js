@@ -226,61 +226,23 @@ export function simulate(snapshot, bombs) {
 }
 
 const pause = () => new Promise((resolve) => setTimeout(resolve, 0));
-export async function calculate(
-  snapshot,
-  { gap = 1, directionUp = true, signal } = {},
-) {
+export async function calculate(snapshot, { signal } = {}) {
+  signal?.throwIfAborted();
   const silos = snapshot.silos.filter((s) => !s.underConstruction);
   if (!silos.length) return { status: "no-silos" };
   const anchor = [...silos].sort(
     (a, b) => manhattan(a, snapshot.target) - manhattan(b, snapshot.target),
   )[0];
-  const ready = silos.reduce(
-    (sum, s) => sum + Math.max(0, s.level - s.queue.length),
-    0,
-  );
-  const maxBombs = 300;
-  const check = (sources, count) => {
-    signal?.throwIfAborted();
-    const bombs = makeSalvo(snapshot, sources, count, gap, directionUp);
-    const result = simulate(snapshot, bombs);
-    return {
-      ...result,
-      bombs: count,
-      launched: bombs.length,
-      orderSeconds:
-        (Math.max(0, Math.ceil(count / 5) - 1) *
-          gap *
-          snapshot.rules.msPerTick) /
-        1000,
-      departureSeconds: bombs.length
-        ? ((Math.max(...bombs.map((b) => b.firstMotion)) -
-            Math.min(...bombs.map((b) => b.firstMotion))) *
-            snapshot.rules.msPerTick) /
-          1000
-        : 0,
-    };
+  const defense = {
+    ...snapshot,
+    sams: snapshot.sams.map((s) => ({ ...s, queue: [], upgrade: null })),
   };
-  const current = check(silos, Math.min(ready, maxBombs));
-  if (current.breached) {
-    let low = 1,
-      high = Math.min(ready, maxBombs);
-    while (low < high) {
-      const mid = Math.floor((low + high) / 2);
-      if (check(silos, mid).breached) high = mid;
-      else low = mid + 1;
-      await pause();
-    }
-    Object.assign(current, check(silos, low));
-  }
-  const recommendations = [];
-  // These are balanced, adjacent layouts at the closest silo, not arbitrary
-  // placements. Keeping that constraint explicit avoids a false global minimum.
+  const maxBombs = 300;
+  const gap = 1;
   for (let number = 1; number <= 5; number++) {
-    let found = null;
-    for (let total = 1; total <= maxBombs; total++) {
-      if (total < number) continue;
-      const hypothetical = Array.from({ length: number }, (_, i) => ({
+    for (let total = number; total <= maxBombs; total++) {
+      signal?.throwIfAborted();
+      const sources = Array.from({ length: number }, (_, i) => ({
         ...anchor,
         id: `planned-${i}`,
         level: Math.floor(total / number) + (i < total % number ? 1 : 0),
@@ -288,29 +250,30 @@ export async function calculate(
         x: anchor.x,
         y: anchor.y + i * snapshot.rules.structureSpacing,
       }));
-      if (hypothetical.some((s) => s.y >= snapshot.rules.height)) break;
-      const result = check(hypothetical, total);
-      if (result.breached) {
-        found = {
-          ...result,
-          levels: hypothetical.map((s) => s.level),
-          positions: hypothetical.map((s) => ({ x: s.x, y: s.y })),
-        };
-        break;
+      if (sources.some((s) => s.y >= snapshot.rules.height)) break;
+      for (const directionUp of [true, false]) {
+        const bombs = makeSalvo(defense, sources, total, gap, directionUp);
+        const outcome = simulate(defense, bombs);
+        if (outcome.breached)
+          return {
+            status: "ready",
+            anchor,
+            maxBombs,
+            plan: {
+              bombs: total,
+              levels: sources.map((s) => s.level),
+              positions: sources.map((s) => ({ x: s.x, y: s.y })),
+              directionUp,
+              orderIntervalSeconds: (gap * snapshot.rules.msPerTick) / 1000,
+              orderSeconds:
+                ((Math.ceil(total / 5) - 1) * gap * snapshot.rules.msPerTick) /
+                1000,
+            },
+          };
       }
       if (total % 8 === 0) await pause();
     }
-    recommendations.push({ silos: number, plan: found });
     await pause();
   }
-  return {
-    status: "ready",
-    current,
-    recommendations,
-    ready,
-    maxBombs,
-    anchor,
-    gap,
-    directionUp,
-  };
+  return { status: "not-found", maxBombs };
 }

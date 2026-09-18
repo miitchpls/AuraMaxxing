@@ -18,28 +18,18 @@ const feature = {
     body.innerHTML = `
       <p class="text-xs">Estimate an atom-bomb breach at a map point.</p>
       <button type="button" class="${buttonClass}" data-pick>Select target</button>
-      <label class="flex flex-col gap-2 text-xs">Orders per second (×5)
-        <select class="bg-gray-800 text-white border rounded-md" data-rate>
-          <option value="1">10 / second</option><option value="2">5 / second</option>
-          <option value="5">2 / second</option><option value="10">1 / second</option>
-        </select>
-      </label>
-      <label class="flex items-center gap-2 text-xs"><input type="checkbox" data-direction checked>Arc upwards</label>
       <button type="button" class="${buttonClass}" data-refresh disabled>Recalculate</button>
       <p class="text-xs" role="status" aria-live="polite" data-status>Select a target to calculate.</p>
       <div class="flex flex-col gap-2 text-xs" data-result></div>`;
     const pick = body.querySelector("[data-pick]");
     const refresh = body.querySelector("[data-refresh]");
-    const rate = body.querySelector("[data-rate]");
-    const direction = body.querySelector("[data-direction]");
     const status = body.querySelector("[data-status]");
     const output = body.querySelector("[data-result]");
-    let destination = output;
     const line = (text, bold = false) => {
       const p = document.createElement("p");
       if (bold) p.className = "font-bold";
       p.textContent = text;
-      destination.appendChild(p);
+      output.appendChild(p);
     };
     const run = async (select) => {
       controller?.abort();
@@ -47,7 +37,6 @@ const feature = {
       controller = runController;
       const { signal } = runController;
       output.replaceChildren();
-      destination = output;
       try {
         let snapshot;
         if (select) {
@@ -83,92 +72,39 @@ const feature = {
             "Select an enemy or unowned target. Alliance changes are not simulated.";
           return;
         }
-        status.textContent = "Calculating trajectories and SAM reloads…";
+        status.textContent = "Finding a breach plan…";
         pick.textContent = "Select another target";
-        const result = await api.breach.calculate(snapshot, {
-          gap: Number(rate.value),
-          directionUp: direction.checked,
-          signal,
-        });
+        const result = await api.breach.calculate(snapshot, { signal });
         if (signal.aborted) return;
         if (result.status === "no-silos") {
           status.textContent =
             "Build a missile silo first; its position defines the launch route.";
           return;
         }
-        status.textContent = `Target ${snapshot.target.x}, ${snapshot.target.y} · snapshot at tick ${snapshot.tick}`;
-        const current = result.current;
-        const engaged = current.shots.filter((s) => s.shots > 0);
-        line(
-          `${engaged.length} SAMs would fire on this salvo. ${result.ready} missiles ready.`,
-        );
-        line(
-          current.breached
-            ? `Estimated breach: ${current.bombs} atom bombs.`
-            : `No breach predicted with ${current.launched} bombs.`,
-          true,
-        );
-        if (current.breached) {
+        status.textContent = `Target ${snapshot.target.x}, ${snapshot.target.y}`;
+        if (result.status === "not-found") {
           line(
-            `Send ×5 orders over ${seconds(current.orderSeconds)}. Departures span ${seconds(current.departureSeconds)}.`,
+            `No plan found within 5 silos and ${result.maxBombs} bombs. Try another launch location.`,
           );
-          if (snapshot.bombCost !== null) {
-            const cost = BigInt(snapshot.bombCost) * BigInt(current.bombs);
-            line(
-              `Bomb cost: ${cost.toLocaleString("en-US")} gold${cost > BigInt(snapshot.gold) ? " — not enough gold" : ""}.`,
-            );
-          }
+          return;
         }
-        if (!snapshot.canLaunch)
-          line(
-            "The game currently rejects launches at this point. Check gold, ammo and target restrictions.",
-          );
-        const plans = result.recommendations.filter((r) => r.plan);
-        line("Suggested layout", true);
-        if (!plans.length)
-          line(`None found within ${result.maxBombs} bombs and 5 silos.`);
-        const best = plans[0];
-        if (best) {
-          const { silos, plan } = best;
-          line(
-            `${silos} silo${silos === 1 ? "" : "s"}: levels ${plan.levels.join(" + ")}.`,
-            true,
-          );
-          line(
-            `${plan.bombs} bombs · ×5 orders in ${seconds(plan.orderSeconds)} · departures over ${seconds(plan.departureSeconds)}.`,
-          );
-        }
-        const details = document.createElement("details");
-        details.innerHTML =
-          '<summary class="cursor-pointer">Other layouts & assumptions</summary>';
-        output.appendChild(details);
-        destination = document.createElement("div");
-        destination.className = "flex flex-col gap-2 mt-2";
-        details.appendChild(destination);
-        for (const { silos, plan } of plans.slice(1)) {
-          line(
-            `${silos} silos: ${plan.levels.join(" + ")} → ${plan.bombs} bombs; orders in ${seconds(plan.orderSeconds)}.`,
-          );
-        }
-        if (!result.recommendations[0].plan)
-          line(`One silo: no breach found up to level ${result.maxBombs}.`);
+        const { plan } = result;
+        line(`${plan.bombs} atom bomb${plan.bombs === 1 ? "" : "s"}`, true);
         line(
-          `Layouts start at ${result.anchor.x}, ${result.anchor.y}, then extend south every ${snapshot.rules.structureSpacing} tiles. Fully loaded; check ownership and space before building.`,
+          `${plan.levels.length} silo${plan.levels.length === 1 ? "" : "s"} · levels ${plan.levels.join(" + ")}`,
+        );
+        line(`Fire with the ${plan.directionUp ? "upward" : "downward"} arc.`);
+        line(
+          plan.bombs <= 5
+            ? "Send one order."
+            : `Send ×5 orders every ${seconds(plan.orderIntervalSeconds)}, over ${seconds(plan.orderSeconds)}.`,
         );
         line(
-          `Smallest levels found for these balanced layouts, capped at ${result.maxBombs} bombs. Other placements can differ.`,
+          `Place at ${plan.positions.map((p) => `(${p.x}, ${p.y})`).join(", ")}.`,
         );
         line(
-          `SAM levels firing: ${engaged.map((s) => snapshot.sams.find((sam) => sam.id === s.id).level).join(" + ") || "none"}.`,
+          "Assumes fully loaded SAMs and silos. Check placement; all launch orders must be accepted.",
         );
-        destination = output;
-        line(
-          "Estimate assumes accepted orders and unchanged defenses. Recalculate before firing.",
-        );
-        if (snapshot.inFlight)
-          line(
-            `${snapshot.inFlight} missiles in flight are excluded; the battle may change the result.`,
-          );
       } catch (error) {
         if (signal.aborted) return;
         console.warn(
@@ -194,16 +130,6 @@ const feature = {
     refresh.addEventListener("click", () => {
       if (lastTarget) void run(false);
     });
-    const changed = () => {
-      controller?.abort();
-      controller = null;
-      pick.textContent = "Select target";
-      output.replaceChildren();
-      status.textContent =
-        "Settings changed. Recalculate to update the estimate.";
-    };
-    rate.addEventListener("change", changed);
-    direction.addEventListener("change", changed);
     removeSection = addSection({ id: feature.id, title: feature.name, body });
   },
   disable() {
