@@ -7,6 +7,13 @@ import {
 } from "../src/api/breachModel.js";
 
 const snapshot = {
+  bombCost: "750000",
+  siloCost: "1000000",
+  buildSites: [
+    { x: 200, y: 432 },
+    { x: 200, y: 448 },
+    { x: 200, y: 464 },
+  ],
   rules: {
     width: 1200,
     height: 800,
@@ -93,6 +100,19 @@ const result = await calculate(snapshot);
 assert.deepEqual(result.plan.levels, [52, 51]);
 assert.equal(result.plan.bombs, 103);
 assert.equal(result.plan.orderSeconds, 2);
+assert.equal(result.plan.cost, "79250000");
+const fromOne = await calculate({
+  ...snapshot,
+  silos: [{ ...snapshot.silos[0], level: 1 }],
+});
+assert.deepEqual(fromOne.plan.levels, [34, 34, 33]);
+assert.equal(fromOne.plan.bombs, 101);
+assert.equal(fromOne.plan.cost, "175750000");
+assert.ok(BigInt(fromOne.plan.cost) < 103n * 750000n + 102n * 1000000n);
+assert.equal(
+  (await calculate({ ...snapshot, siloCost: null })).status,
+  "no-prices",
+);
 const depleted = {
   ...snapshot,
   sams: snapshot.sams.map((s) => ({

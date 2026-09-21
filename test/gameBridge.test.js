@@ -304,12 +304,15 @@ Object.assign(game, {
   height: () => 800,
   width: () => 1200,
   hasOwner: () => false,
+  isLand: () => true,
+  isImpassable: () => false,
   units: (type) =>
     type === "SAM Launcher"
       ? [unit(1, 100), unit(2, 50, true), unit(3, 10, false, true)]
       : [],
 });
 ownedUnits = [unit(4, 51)];
+player.buildables = async (_,types) => [{cost: types[0] === "Atom Bomb" ? 750000n : 1000000n, canBuild:false}];
 const breach = await request({ kind: "breachState", worldX: 800, worldY: 400 });
 assert.equal(breach.ready, true);
 assert.equal(breach.valid, true);
@@ -318,6 +321,9 @@ assert.equal(breach.sams.length, 1);
 assert.deepEqual(breach.sams[0].queue, [-5]);
 assert.equal(breach.silos[0].level, 51);
 assert.equal(breach.rules.samCooldown, 90);
+assert.equal(breach.bombCost,"750000");
+assert.equal(breach.siloCost,"1000000");
+assert.equal(breach.buildSites.length,4);
 assert.equal(emitted.length, 2);
 rules.SAMCooldown = undefined;
 assert.equal(

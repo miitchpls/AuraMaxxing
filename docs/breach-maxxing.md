@@ -1,51 +1,60 @@
 # BreachMaxxing
 
-Read-only atom-bomb calculator. Select a target to get one sufficient hypothetical
-configuration, its launch direction, positions and timing. Recalculate when the
-positions or levels change. No builds or launch intents are sent.
+Read-only atom-bomb calculator. Select a target or recalculate to get one passing
+configuration, its direction, positions, gold cost and order timing. No builds
+or launch intents are sent.
 
-Both upward and downward arcs are tested automatically. The search prioritizes
-fewer silos, then fewer bombs; an upward arc wins ties. It tests one through five
-fully loaded silos with balanced levels and at most 300 bombs. Layouts start at
-the closest existing silo and extend south at the game's minimum spacing plus
-one tile. Bounds are checked; ownership, terrain and build space need checking.
-No failed layouts or current-ammunition verdicts are displayed.
+The sandbox runs copies of OpenFront's SAM launcher, targeting, interceptor,
+spatial grid and air-path code. Nuke movement and silo scheduling are adapted to
+that sandbox. `npm run sync:breach-engine` regenerates the browser bundle from the
+parent game; the generated manifest records source hashes, including the game
+code governing the adapter and prices. No parent imports are needed at runtime.
+The copied code retains OpenFront's AGPL license in `src/api/vendor/`.
 
 Every hostile SAM starts fully loaded at its level's full range, regardless of
-its current reload or upgrade progress. SAMs still reload during the simulated
-salvo: assuming full initial ammo does not disable their normal recovery.
-The fixed-point trajectories, nearest-silo selection, per-silo departure spacing
-and SAM targeting windows follow the game. Overlapping SAMs reserve targets to
-avoid counting a bomb twice. A reserved interception is assumed successful.
+current reload or upgrade progress. Reloads, competing SAMs, target reservations
+and interceptor travel then follow the game engine. Both arcs are tested; a
+breach requires an actual surviving impact, not just an unreserved missile.
+
+Plans are tested in ascending gold cost: bombs plus additional silo levels at
+the prices quoted by the game. Existing levels are not charged again. The search
+reuses existing silos and compares balanced and incremental upgrades across up
+to five sites, with at most 300 bombs. The sites are the nearest existing silos,
+then up to four empty buildable positions near the closest silo. Ownership,
+terrain, bounds and structure spacing are checked. Other existing silos remain
+in the simulation because the game chooses the nearest available launcher.
+The result is the cheapest passing plan among these candidates, not a global
+optimum over every possible position and distribution of levels.
 
 The plan uses one ×5 order per tick (currently 100 ms) and assumes every order is
 accepted. Existing missiles, other attacks, new construction and alliance changes
-are excluded. The minimum is within the tested layout family, not across all
-possible positions. Failure within the search bound does not mean no breach is
-possible.
+are excluded. Initial silo ammunition is full. Failure within the search bound
+does not mean no breach is possible. The calculator does not implement Burst.
 
 ## Verification
 
-- `npm test`: calculator, bridge snapshot, input cleanup, existing features.
-- `npm run test:breach-engine`: 13 scenarios against the parent OpenFront engine;
-  also checks generated trajectories point for point. Requires the parent repo's
-  installed dependencies. Verified against `31937823c`.
+- `npm test`: calculator, cost ordering, bridge snapshot, input cleanup and
+  existing features.
+- `npm run test:breach-engine`: checks vendored source freshness, then 13 scenarios
+  against the parent OpenFront engine. Compares trajectories point for point,
+  SAM launch ticks and targets, first impact tick and breach outcome. Requires
+  the parent repo's installed dependencies. Verified against `31937823c`.
 - Browser fixture: singleplayer, no nations or tribes, infinite gold and instant
   builds; one enemy SAM 100 and own silos 50 and 51. Software rendering was
   enabled only in the test browser to allow the headless local run.
 
-For a target 600 tiles east of the first silo, with the second 16 tiles south,
-using ×5 orders every tick (100 ms): 50+51 and 51+51 are blocked; 52+51 and
-34+34+33 breach. All orders at the same tick can make 50+51 breach, but that is
-not a server delivery guarantee. Moving the launch site changes the outcome.
+For the test target 600 tiles east of the first silo, 50+51 and 51+51 are blocked;
+52+51 and 34+34+33 breach with ×5 orders every tick. With existing 50+51 silos,
+52+51 and 103 bombs cost 79.25M additional gold. Starting from one level-1 silo,
+the candidate search prefers 34+34+33 and 101 bombs at 175.75M. These are fixture
+results, not universal formulas: moving the launch site changes the outcome.
 
 Page-world imports exercise the real game and panel but do not validate Chrome's
 isolated-world boundary. A real extension reload is required for that last check.
 
 ## Screenshots
 
-Same local fixture and 1400 × 1000 viewport. The three units remain
-unchanged after selecting the target; the extension logs no runtime errors.
+Same local fixture and 1400 × 1000 viewport, without and with the extension.
 
 ![Without AuraMaxxing](images/breach-before.png)
 

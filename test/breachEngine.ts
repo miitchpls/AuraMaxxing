@@ -106,6 +106,7 @@ export function runScenario(options: any) {
     structureSpacing: 16,
   };
   const snapshot = {
+    tick: game.ticks(),
     target: { x: 800, y: 400 },
     rules,
     silos: silos.map((u: any) => ({
@@ -140,13 +141,11 @@ export function runScenario(options: any) {
           rules,
           direction,
         ),
-        u
-          .trajectory()
-          .map((p: any) => ({
-            x: game.x(p.tile),
-            y: game.y(p.tile),
-            targetable: p.targetable,
-          })),
+        u.trajectory().map((p: any) => ({
+          x: game.x(p.tile),
+          y: game.y(p.tile),
+          targetable: p.targetable,
+        })),
       );
       const row: any = {
         kind: "launch",
@@ -267,6 +266,26 @@ export function runScenario(options: any) {
   const predicted = simulate(
     snapshot,
     makeSalvo(snapshot, snapshot.silos, count, gap, direction),
+    { trace: true },
+  );
+  assert.equal(
+    predicted.firstImpact,
+    events.find((e) => e.kind === "impact")?.tick ?? null,
+    options.name + " first impact",
+  );
+  assert.deepEqual(
+    predicted.launches,
+    shots
+      .filter(
+        (s) =>
+          predicted.firstImpact === null || s.tick <= predicted.firstImpact,
+      )
+      .map((s) => ({
+        tick: s.tick,
+        sam: s.sam,
+        target: launches.findIndex((b) => b.id === s.target),
+      })),
+    options.name + " SAM launches",
   );
   assert.equal(predicted.breached, landed > 0, options.name);
   assert.equal(

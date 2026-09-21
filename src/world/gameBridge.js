@@ -318,7 +318,10 @@ const breachState = async ({ id, screenX, screenY, worldX, worldY }) => {
         upgrade: upgrading
           ? {
               start: state.samUpgradeStartTick - tick,
-              end: state.samUpgradeStartTick + (state.samUpgradeDuration ?? config.samUpgradeDuration()) - tick,
+              end:
+                state.samUpgradeStartTick +
+                (state.samUpgradeDuration ?? config.samUpgradeDuration()) -
+                tick,
               from: state.samUpgradeStartRange,
             }
           : null,
@@ -329,8 +332,60 @@ const breachState = async ({ id, screenX, screenY, worldX, worldY }) => {
     .filter((unit) => unit.isActive())
     .map(serialize);
   const targetTile = game.ref(target.x, target.y);
-  const found = await player.buildables(targetTile, ["Atom Bomb"]);
-  const buildable = (Array.isArray(found) ? found : [found])[0];
+  const [bombQuote, siloQuote] = await Promise.all([
+    player.buildables(targetTile, ["Atom Bomb"]),
+    player.buildables(
+      silos.length ? game.ref(silos[0].x, silos[0].y) : targetTile,
+      ["Missile Silo"],
+    ),
+  ]);
+  const buildable = (Array.isArray(bombQuote) ? bombQuote : [bombQuote])[0];
+  const siloBuildable = (Array.isArray(siloQuote) ? siloQuote : [siloQuote])[0];
+  const buildSites = [];
+  const anchor = [...silos].sort(
+    (a, b) =>
+      Math.abs(a.x - target.x) +
+      Math.abs(a.y - target.y) -
+      Math.abs(b.x - target.x) -
+      Math.abs(b.y - target.y),
+  )[0];
+  if (anchor) {
+    const spacing = config.structureMinDist() + 1;
+    const structures = game
+      .units(
+        "City",
+        "Defense Post",
+        "SAM Launcher",
+        "Missile Silo",
+        "Port",
+        "Factory",
+      )
+      .map((u) => ({ x: game.x(u.tile()), y: game.y(u.tile()) }));
+    for (let ring = 1; ring <= 5 && buildSites.length < 4; ring++) {
+      for (let dx = -ring; dx <= ring && buildSites.length < 4; dx++)
+        for (let dy = -ring; dy <= ring && buildSites.length < 4; dy++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue;
+          const p = { x: anchor.x + dx * spacing, y: anchor.y + dy * spacing };
+          if (!game.isValidCoord(p.x, p.y)) continue;
+          const tile = game.ref(p.x, p.y);
+          if (
+            game.owner(tile) !== player ||
+            !game.isLand(tile) ||
+            game.isImpassable(tile)
+          )
+            continue;
+          if (
+            [...structures, ...buildSites].some(
+              (u) =>
+                (p.x - u.x) ** 2 + (p.y - u.y) ** 2 <
+                config.structureMinDist() ** 2,
+            )
+          )
+            continue;
+          buildSites.push(p);
+        }
+    }
+  }
   reply({
     kind: "breachState",
     id,
@@ -342,6 +397,8 @@ const breachState = async ({ id, screenX, screenY, worldX, worldY }) => {
     silos,
     gold: String(player.gold()),
     bombCost: buildable ? String(buildable.cost) : null,
+    siloCost: siloBuildable ? String(siloBuildable.cost) : null,
+    buildSites,
     canLaunch: Boolean(buildable) && buildable.canBuild !== false,
     friendlyTarget:
       game.hasOwner(targetTile) &&
