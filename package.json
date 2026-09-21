@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node test/planBatches.test.js && node test/projectCost.test.js && node test/input.test.js && node test/gameBridge.test.js && node test/intents.test.js && node test/hippieMaxxing.test.js && node test/adMaxxing.test.js && node test/breachModel.test.js",
+    "test": "node test/planBatches.test.js && node test/projectCost.test.js && node test/peakTroops.test.js && node test/input.test.js && node test/gameBridge.test.js && node test/intents.test.js && node test/hippieMaxxing.test.js && node test/adMaxxing.test.js && node test/breachModel.test.js",
     "test:breach-engine": "node scripts/syncBreachEngine.mjs --check && ../node_modules/.bin/tsx --tsconfig ../tsconfig.json test/breachEngine.ts",
     "sync:breach-engine": "node scripts/syncBreachEngine.mjs"
   }

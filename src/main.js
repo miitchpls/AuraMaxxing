@@ -5,12 +5,13 @@ import * as intents from "./api/intents.js";
 import adMaxxing from "./features/adMaxxing.js";
 import buildMaxxing from "./features/buildMaxxing.js";
 import hippieMaxxing from "./features/hippieMaxxing.js";
+import peakMaxxing from "./features/peakMaxxing.js";
 
 import * as breach from "./api/breachModel.js";
 import breachMaxxing from "./features/breachMaxxing.js";
 
 const api = { dom, game, input, intents, breach };
-const features = [buildMaxxing, breachMaxxing, hippieMaxxing, adMaxxing];
+const features = [buildMaxxing, breachMaxxing, hippieMaxxing, peakMaxxing, adMaxxing];
 
 for (const feature of features) {
   const missing = feature.requires.filter((name) => !api[name].available());
