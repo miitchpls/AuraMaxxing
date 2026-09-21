@@ -208,19 +208,17 @@ const allianceState = async ({ id }) => {
   }
 
   const { game, player } = context;
-  const candidates = game
-    .players()
-    .filter((other) => {
-      const allied = player.isAlliedWith(other);
-      return (
-        other !== player &&
-        ALLIANCE_PLAYER_TYPES.has(other.type?.()) &&
-        other.isAlive() &&
-        !other.isDisconnected() &&
-        (!player.isFriendly(other) || allied) &&
-        !player.isRequestingAllianceWith(other)
-      );
-    });
+  const candidates = game.players().filter((other) => {
+    const allied = player.isAlliedWith(other);
+    return (
+      other !== player &&
+      ALLIANCE_PLAYER_TYPES.has(other.type?.()) &&
+      other.isAlive() &&
+      !other.isDisconnected() &&
+      (!player.isFriendly(other) || allied) &&
+      !player.isRequestingAllianceWith(other)
+    );
+  });
 
   const actions = await Promise.all(
     candidates.map(async (other) => {
@@ -261,7 +259,9 @@ const allianceAction = async ({ id, action, recipient, token }) => {
   }
 
   const { game, eventBus, player, requestType, extensionType } = context;
-  const other = game.players().find((candidate) => candidate.id() === recipient);
+  const other = game
+    .players()
+    .find((candidate) => candidate.id() === recipient);
   if (
     !other ||
     other === player ||
@@ -285,7 +285,14 @@ const allianceAction = async ({ id, action, recipient, token }) => {
   reply({ kind: "allianceAction", id, ready: true, sent: false });
 };
 
-const breachState = async ({ id, screenX, screenY, worldX, worldY }) => {
+const breachState = async ({
+  id,
+  screenX,
+  screenY,
+  worldX,
+  worldY,
+  onlyTarget = false,
+}) => {
   const element = document.querySelector(BUILD_MENU);
   const game = element?.game;
   const player = game?.myPlayer?.();
@@ -316,6 +323,8 @@ const breachState = async ({ id, screenX, screenY, worldX, worldY }) => {
   if (!target || !game.isValidCoord(target.x, target.y)) {
     return reply({ kind: "breachState", id, ready: true, valid: false });
   }
+  const targetTile = game.ref(target.x, target.y);
+  const targetOwner = game.hasOwner(targetTile) ? game.owner(targetTile) : null;
   const tick = game.ticks();
   const serialize = (unit) => ({
     id: unit.id(),
@@ -331,7 +340,9 @@ const breachState = async ({ id, screenX, screenY, worldX, worldY }) => {
       (unit) =>
         unit.isActive() &&
         !unit.isUnderConstruction() &&
-        !unit.owner().isFriendly(player),
+        unit.owner() !== player &&
+        !unit.owner().isOnSameTeam(player) &&
+        (!onlyTarget || unit.owner() === targetOwner),
     )
     .map((unit) => {
       const state = unit.state;
@@ -357,7 +368,6 @@ const breachState = async ({ id, screenX, screenY, worldX, worldY }) => {
     .units("Missile Silo")
     .filter((unit) => unit.isActive())
     .map(serialize);
-  const targetTile = game.ref(target.x, target.y);
   const [bombQuote, siloQuote] = await Promise.all([
     player.buildables(targetTile, ["Atom Bomb"]),
     player.buildables(
@@ -426,10 +436,9 @@ const breachState = async ({ id, screenX, screenY, worldX, worldY }) => {
     siloCost: siloBuildable ? String(siloBuildable.cost) : null,
     buildSites,
     canLaunch: Boolean(buildable) && buildable.canBuild !== false,
-    friendlyTarget:
-      game.hasOwner(targetTile) &&
-      game.owner(targetTile).isPlayer() &&
-      game.owner(targetTile).isFriendly(player),
+    protectedTarget:
+      targetOwner !== null &&
+      (targetOwner === player || targetOwner.isOnSameTeam(player)),
     inFlight: game.units("Atom Bomb", "Hydrogen Bomb", "MIRV", "MIRV Warhead")
       .length,
     rules: {

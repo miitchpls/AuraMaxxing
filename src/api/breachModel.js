@@ -52,10 +52,8 @@ export async function calculate(snapshot, { signal } = {}) {
     .filter((s) => !s.underConstruction)
     .map((s) => ({ ...s, queue: [] }));
   if (!owned.length) return { status: "no-silos" };
-  if (snapshot.bombCost == null || snapshot.siloCost == null)
-    return { status: "no-prices" };
-  const bombPrice = BigInt(snapshot.bombCost),
-    siloPrice = BigInt(snapshot.siloCost);
+  if (snapshot.bombCost == null) return { status: "no-prices" };
+  const bombPrice = BigInt(snapshot.bombCost);
   const ordered = [...owned].sort(
     (a, b) => manhattan(a, snapshot.target) - manhattan(b, snapshot.target),
   );
@@ -90,7 +88,7 @@ export async function calculate(snapshot, { signal } = {}) {
       sources,
       count,
       additions,
-      cost: BigInt(count) * bombPrice + BigInt(additions) * siloPrice,
+      cost: BigInt(count) * bombPrice,
     });
   };
   const capacity = owned.reduce((n, s) => n + s.level, 0);

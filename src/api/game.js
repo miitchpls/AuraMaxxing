@@ -8,7 +8,6 @@ const REQUEST = "auramaxxing:game-request";
 const RESPONSE = "auramaxxing:game-response";
 const TIMEOUT_MS = 2000;
 
-
 // The testing flow in AGENTS.md runs two clients at once — the installed
 // extension and a copy loaded from the dev server — and the bridge echoes ids
 // back verbatim, so a bare counter would let one client consume the other's
@@ -101,9 +100,7 @@ export const projectCost = (unitType, base, count) => {
     } else if (stepping !== undefined) {
       const next = price + stepping.step;
       price =
-        stepping.cap !== undefined && next > stepping.cap
-          ? stepping.cap
-          : next;
+        stepping.cap !== undefined && next > stepping.cap ? stepping.cap : next;
     }
   }
   return total;
@@ -173,7 +170,7 @@ export const sendAllianceAction = (action, recipient, { signal } = {}) => {
   );
 };
 
-export const breachAt = (x, y) =>
-  ask({ kind: "breachState", screenX: x, screenY: y });
-export const breachWorld = (x, y) =>
-  ask({ kind: "breachState", worldX: x, worldY: y });
+export const breachAt = (x, y, { onlyTarget = false } = {}) =>
+  ask({ kind: "breachState", screenX: x, screenY: y, onlyTarget });
+export const breachWorld = (x, y, { onlyTarget = false } = {}) =>
+  ask({ kind: "breachState", worldX: x, worldY: y, onlyTarget });

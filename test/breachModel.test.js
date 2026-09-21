@@ -100,17 +100,17 @@ const result = await calculate(snapshot);
 assert.deepEqual(result.plan.levels, [52, 51]);
 assert.equal(result.plan.bombs, 103);
 assert.equal(result.plan.orderSeconds, 2);
-assert.equal(result.plan.cost, "79250000");
+assert.equal(result.plan.cost, "77250000");
 const fromOne = await calculate({
   ...snapshot,
   silos: [{ ...snapshot.silos[0], level: 1 }],
 });
 assert.deepEqual(fromOne.plan.levels, [34, 34, 33]);
 assert.equal(fromOne.plan.bombs, 101);
-assert.equal(fromOne.plan.cost, "175750000");
-assert.ok(BigInt(fromOne.plan.cost) < 103n * 750000n + 102n * 1000000n);
+assert.equal(fromOne.plan.cost, "75750000");
+assert.deepEqual(await calculate({ ...snapshot, siloCost: null }), result);
 assert.equal(
-  (await calculate({ ...snapshot, siloCost: null })).status,
+  (await calculate({ ...snapshot, bombCost: null })).status,
   "no-prices",
 );
 const depleted = {
