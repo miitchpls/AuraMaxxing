@@ -13,7 +13,7 @@ import {
   projectWorld,
   quote,
 } from "../api/game.js";
-import { confirmBuild } from "../api/intents.js";
+import { confirmBuild, upgradeStructure } from "../api/intents.js";
 import { addSection } from "../ui/panel.js";
 
 const LABELS = {
@@ -41,6 +41,10 @@ const CONFIRM_TIMEOUT_MS = 5000;
 // state are refreshed on a slow timer rather than only when a field changes.
 const COST_REFRESH_MS = 2000;
 const POLL_TIMEOUT_MS = 60000;
+const UPGRADE_POLL_MS = 100;
+// A batch the gold cannot fully cover yet goes out at most this often, so a slow
+// trickle of income does not turn into a stream of tiny intents.
+const PARTIAL_UPGRADE_MS = 1000;
 
 const wait = (ms, signal) =>
   new Promise((resolve, reject) => {
@@ -71,12 +75,15 @@ const chunk = (count) => [
   ...Array(count % BATCH_SIZE).fill(1),
 ];
 
-export const planBatches = (action, count, firstIsBuild) => {
-  const { batching } = BUILDABLES[action];
-  if (batching === "build") return chunk(count);
-  if (batching !== "upgrade") return Array(count).fill(1);
-  // A build ignores the multiplier, so only the upgrades that follow batch.
-  return firstIsBuild ? [1, ...chunk(count - 1)] : chunk(count);
+export const planBatches = (action, count) =>
+  BUILDABLES[action].batching === "build" ? chunk(count) : Array(count).fill(1);
+
+// `costs` are the game's running totals for 1..N upgrades in one intent.
+export const upgradeAmount = (costs, gold, remaining) => {
+  const wanted = Math.min(remaining, costs.length);
+  let amount = 0;
+  while (amount < wanted && BigInt(costs[amount]) <= BigInt(gold)) amount++;
+  return { amount, full: amount === wanted };
 };
 
 // Only the confirm reaches the server; the key presses stay in the client. So
@@ -197,6 +204,81 @@ const waitUntilAffordable = async (point, action, size, signal) => {
     await wait(POLL_INTERVAL_MS, signal);
   }
   return { blocked: "cancelled" };
+};
+
+const runKeyboard = async (point, action, batches, cursor, signal, progress) => {
+  let done = 0;
+  for (const size of batches) {
+    const { state, blocked } = await waitUntilAffordable(
+      point,
+      action,
+      size,
+      signal,
+    );
+    if (blocked) return { done, blocked };
+    await runBatch(action, size, point, cursor, signal, () =>
+      progress(done, "pacing"),
+    );
+    progress(done, "confirming");
+    const result = await confirmBatch(point, action, size, state, signal);
+    done += result.confirmed;
+    if (result.blocked) return { done, blocked: result.blocked };
+    progress(done);
+  }
+  return { done };
+};
+
+// Upgrades skip the keyboard: one intent carries as many levels as the game
+// accepts, so each one buys the largest amount the gold covers right now.
+const runUpgrades = async (point, action, count, signal, progress) => {
+  let done = 0;
+  let lastSend = 0;
+  let deadline = Date.now() + POLL_TIMEOUT_MS;
+  while (done < count) {
+    if (signal.aborted) throw signal.reason;
+    const state = await inspectWorld(point.x, point.y, action);
+    if (signal.aborted) throw signal.reason;
+    if (!state.ready || !state.valid) {
+      return { done, blocked: "game not ready" };
+    }
+
+    const upgradable =
+      state.targetUnitId !== null &&
+      state.targetUnitId !== undefined &&
+      Array.isArray(state.upgradeCosts);
+    const { amount, full } = upgradable
+      ? upgradeAmount(state.upgradeCosts, state.gold, count - done)
+      : { amount: 0, full: false };
+    if (amount === 0 || (!full && Date.now() - lastSend < PARTIAL_UPGRADE_MS)) {
+      if (Date.now() > deadline) {
+        return {
+          done,
+          blocked: upgradable ? "not enough gold" : "target not upgradable",
+        };
+      }
+      await wait(UPGRADE_POLL_MS, signal);
+      continue;
+    }
+
+    const sent = await upgradeStructure(
+      "buildMaxxing",
+      state.targetUnitId,
+      action,
+      amount,
+      { signal, onWait: () => progress(done, "pacing") },
+    );
+    if (!sent.sent) return { done, blocked: "upgrade unavailable" };
+    lastSend = Date.now();
+    progress(done, "confirming");
+    const result = await confirmBatch(point, action, amount, state, signal);
+    done += result.confirmed;
+    if (result.confirmed > 0) deadline = Date.now() + POLL_TIMEOUT_MS;
+    if (result.blocked === "target changed") {
+      return { done, blocked: result.blocked };
+    }
+    progress(done);
+  }
+  return { done };
 };
 
 // Resolves on a click, never on a drag: a press-and-drag has to reach the game
@@ -404,33 +486,39 @@ const start = async (body) => {
       const screen = await projectWorld(point.x, point.y);
       if (!screen.ready || !screen.valid) throw new Error("Target unavailable");
       cursor = pinCursor(screen.screenX, screen.screenY);
-      const batches = planBatches(action, count, !target.canUpgrade);
       let done = 0;
-      for (const size of batches) {
-        if (signal.aborted) break;
-        const { state, blocked } = await waitUntilAffordable(
+      const progress = (current, phase) => {
+        const total = done + current;
+        status.textContent = phase
+          ? `${total}/${count} — ${phase}`
+          : `${total}/${count}`;
+      };
+      const upgrades = BUILDABLES[action].batching === "upgrade";
+      // A build ignores the multiplier, so only what follows it can batch.
+      let result = await runKeyboard(
+        point,
+        action,
+        upgrades ? (target.canUpgrade ? [] : [1]) : planBatches(action, count),
+        cursor,
+        signal,
+        progress,
+      );
+      done = result.done;
+      if (upgrades && !result.blocked && done < count) {
+        result = await runUpgrades(
           point,
           action,
-          size,
+          count - done,
           signal,
+          progress,
         );
-        if (blocked) {
-          status.textContent = `Stopped at ${done}: ${blocked}`;
-          break;
-        }
-        await runBatch(action, size, point, cursor, signal, () => {
-          status.textContent = `${done}/${count} — pacing`;
-        });
-        status.textContent = `${done}/${count} — confirming`;
-        const result = await confirmBatch(point, action, size, state, signal);
-        done += result.confirmed;
-        if (result.blocked) {
-          status.textContent = `Stopped at ${done}: ${result.blocked}`;
-          break;
-        }
-        status.textContent = `${done}/${count}`;
+        done += result.done;
       }
-      if (done >= count) status.textContent = "Done";
+      if (!signal.aborted) {
+        status.textContent = result.blocked
+          ? `Stopped at ${done}: ${result.blocked}`
+          : "Done";
+      }
     }
   } catch (error) {
     if (!signal.aborted && activeRun === run) {

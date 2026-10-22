@@ -4,7 +4,7 @@
 // The server drops intents past 10 per second or 150 per minute, silently: the
 // action simply never happened, with no error and no retry. These budgets stay
 // under that, because the same allowance also carries the player's own moves.
-import { sendAllianceAction } from "./game.js";
+import { sendAllianceAction, sendUpgrade } from "./game.js";
 
 const BUDGET_PER_SECOND = 5;
 const BUDGET_PER_MINUTE = 100;
@@ -110,6 +110,9 @@ const sendEnter = () =>
 
 export const confirmBuild = (featureId, options) =>
   enqueue(featureId, sendEnter, options);
+
+export const upgradeStructure = (featureId, unitId, action, amount, options) =>
+  enqueue(featureId, () => sendUpgrade(unitId, action, amount), options);
 
 export const requestAlliance = (recipient, options) =>
   enqueue(

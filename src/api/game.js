@@ -128,6 +128,14 @@ export const quote = async (action, count) => {
   };
 };
 
+export const sendUpgrade = (unitId, action, amount) =>
+  ask({
+    kind: "upgrade",
+    unitId,
+    unitType: BUILDABLES[action].unitType,
+    amount,
+  });
+
 export const allianceActions = () => ask({ kind: "allianceState" });
 
 export const sendAllianceAction = (action, recipient, { signal } = {}) => {

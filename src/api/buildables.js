@@ -1,7 +1,7 @@
 // One row per buildable thing: the key the game binds it to by default, the unit
-// type string the game names it with, and where its x5 multiplier actually
-// lands. The game honours that multiplier on the upgrade path for upgradable
-// structures and, when building, for the atom bomb alone.
+// type string the game names it with, and how it batches. Upgradable structures
+// take a bulk upgrade intent; when building, only the atom bomb honours the x5
+// keyboard multiplier.
 export const BUILDABLES = {
   buildCity: { key: "Digit1", unitType: "City", batching: "upgrade" },
   buildFactory: { key: "Digit2", unitType: "Factory", batching: "upgrade" },
