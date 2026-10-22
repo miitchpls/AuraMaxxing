@@ -8,7 +8,6 @@ const REQUEST = "auramaxxing:game-request";
 const RESPONSE = "auramaxxing:game-response";
 const TIMEOUT_MS = 2000;
 
-
 // The testing flow in AGENTS.md runs two clients at once — the installed
 // extension and a copy loaded from the dev server — and the bridge echoes ids
 // back verbatim, so a bare counter would let one client consume the other's
@@ -101,9 +100,7 @@ export const projectCost = (unitType, base, count) => {
     } else if (stepping !== undefined) {
       const next = price + stepping.step;
       price =
-        stepping.cap !== undefined && next > stepping.cap
-          ? stepping.cap
-          : next;
+        stepping.cap !== undefined && next > stepping.cap ? stepping.cap : next;
     }
   }
   return total;
@@ -136,6 +133,37 @@ export const sendUpgrade = (unitId, action, amount) =>
     amount,
   });
 
+const TROOP_EXPONENT = 0.73;
+const TROOP_CURVE_ITERATIONS = 80;
+
+export const toDisplayedTroops = (troops) => troops / 10;
+
+export const troopIncreaseRateAt = (troops, maxTroops) => {
+  const increase =
+    (10 + Math.pow(troops, TROOP_EXPONENT) / 4) * (1 - troops / maxTroops);
+  return Math.min(troops + increase, maxTroops) - troops;
+};
+
+export const peakTroopTarget = (maxTroops) => {
+  if (!Number.isFinite(maxTroops) || maxTroops <= 0) return null;
+
+  let belowPeak = 0;
+  let abovePeak = maxTroops;
+  for (let i = 0; i < TROOP_CURVE_ITERATIONS; i++) {
+    const troops = (belowPeak + abovePeak) / 2;
+    const slope =
+      (TROOP_EXPONENT / 4) *
+        Math.pow(troops, TROOP_EXPONENT - 1) *
+        (1 - troops / maxTroops) -
+      (10 + Math.pow(troops, TROOP_EXPONENT) / 4) / maxTroops;
+    if (slope > 0) belowPeak = troops;
+    else abovePeak = troops;
+  }
+  return (belowPeak + abovePeak) / 2;
+};
+
+export const troopState = () => ask({ kind: "troops" });
+
 export const allianceActions = () => ask({ kind: "allianceState" });
 
 export const sendAllianceAction = (action, recipient, { signal } = {}) => {
@@ -149,3 +177,8 @@ export const sendAllianceAction = (action, recipient, { signal } = {}) => {
     signal?.removeEventListener("abort", onAbort),
   );
 };
+
+export const breachAt = (x, y, { onlyTarget = false } = {}) =>
+  ask({ kind: "breachState", screenX: x, screenY: y, onlyTarget });
+export const breachWorld = (x, y, { onlyTarget = false } = {}) =>
+  ask({ kind: "breachState", worldX: x, worldY: y, onlyTarget });

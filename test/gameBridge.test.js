@@ -79,8 +79,9 @@ const player = {
   units: () => ownedUnits,
   gold: () => 4000000n,
   readyMissileCount: () => 4,
+  troops: () => 60000,
   id: () => "my-player",
-  isAlive: () => true,
+  isAlive: () => playerAlive,
   isFriendly: () => false,
   isRequestingAllianceWith: () => false,
   isAlliedWith: () => false,
@@ -90,8 +91,14 @@ const player = {
     return { interaction: allianceInteraction };
   },
 };
+let playerAlive = true;
+let activePlayer = player;
 const game = {
-  myPlayer: () => player,
+  myPlayer: () => activePlayer,
+  config: () => ({
+    maxTroops: () => 100000,
+    troopIncreaseRate: () => 321.5,
+  }),
   players: () => [player, other, bot, nation],
   isValidCoord: () => true,
   ref: (x, y) => {
@@ -291,10 +298,157 @@ assert.deepEqual(await cancelledAction, {
 });
 assert.equal(emitted.length, 2);
 
+assert.deepEqual(await request({ kind: "troops" }), {
+  kind: "troops",
+  id: 12,
+  ready: true,
+  troops: 60000,
+  maxTroops: 100000,
+  increasePerSecond: 3215,
+});
+playerAlive = false;
+assert.deepEqual(await request({ kind: "troops" }), {
+  kind: "troops",
+  id: 13,
+  ready: false,
+});
+playerAlive = true;
+activePlayer = null;
+assert.deepEqual(await request({ kind: "troops" }), {
+  kind: "troops",
+  id: 14,
+  ready: false,
+});
+
+activePlayer = player;
+
+const rules = {
+  nukeSpeed: () => 10,
+  SAMCooldown: () => 90,
+  SiloCooldown: () => 90,
+  samRange: (l) => 150 - 480 / (l + 5),
+  maxSamRange: () => 150,
+  defaultSamMissileSpeed: () => 12,
+  defaultNukeTargetableRange: () => 150,
+  msPerTick: () => 100,
+  structureMinDist: () => 15,
+  samUpgradeDuration: () => 45,
+};
+const unit = (id, level, friendly = false, underConstruction = false) => ({
+  id: () => id,
+  level: () => level,
+  tile: () => ({ x: 100 + id, y: 200 }),
+  isActive: () => true,
+  isUnderConstruction: () => underConstruction,
+  missileTimerQueue: () => [95],
+  owner: () => ({ isFriendly: () => friendly, isOnSameTeam: () => false }),
+  state: { samUpgradeStartTick: null },
+});
+Object.assign(game, {
+  config: () => rules,
+  ticks: () => 100,
+  x: (t) => t.x,
+  y: (t) => t.y,
+  height: () => 800,
+  width: () => 1200,
+  hasOwner: () => false,
+  isLand: () => true,
+  isImpassable: () => false,
+  units: (type) =>
+    type === "SAM Launcher"
+      ? [unit(1, 100), unit(2, 50, true), unit(3, 10, false, true)]
+      : [],
+});
+ownedUnits = [unit(4, 51)];
+player.buildables = async (_, types) => [
+  { cost: types[0] === "Atom Bomb" ? 750000n : 1000000n, canBuild: false },
+];
+const breach = await request({ kind: "breachState", worldX: 800, worldY: 400 });
+assert.equal(breach.ready, true);
+assert.equal(breach.valid, true);
+assert.deepEqual(breach.target, { x: 800, y: 400 });
+assert.equal(breach.sams.length, 2);
+assert.deepEqual(breach.sams[0].queue, [-5]);
+assert.equal(breach.silos[0].level, 51);
+assert.equal(breach.rules.samCooldown, 90);
+assert.equal(breach.bombCost, "750000");
+assert.equal(breach.siloCost, "1000000");
+assert.equal(breach.buildSites.length, 4);
+assert.equal(emitted.length, 2);
+const alliedTarget = {
+  isFriendly: () => true,
+  isOnSameTeam: () => false,
+};
+const enemyTarget = {
+  isFriendly: () => false,
+  isOnSameTeam: () => false,
+};
+const teammate = {
+  isFriendly: () => true,
+  isOnSameTeam: () => true,
+};
+let targetOwner = alliedTarget;
+game.hasOwner = () => targetOwner !== null;
+game.owner = ({ x, y }) => (x === 800 && y === 400 ? targetOwner : player);
+game.units = (type) =>
+  type === "SAM Launcher"
+    ? [
+        { ...unit(10, 5), owner: () => alliedTarget },
+        { ...unit(11, 5), owner: () => enemyTarget },
+        unit(12, 5, true),
+        { ...unit(13, 5), owner: () => player },
+        { ...unit(14, 5, false, true), owner: () => alliedTarget },
+        { ...unit(15, 5), owner: () => alliedTarget, isActive: () => false },
+        { ...unit(16, 5), owner: () => teammate },
+      ]
+    : [];
+const breachFor = (onlyTarget = false) =>
+  request({
+    kind: "breachState",
+    worldX: 800,
+    worldY: 400,
+    onlyTarget,
+  });
+const alliedBreach = await breachFor();
+assert.equal(alliedBreach.protectedTarget, false);
+assert.deepEqual(
+  alliedBreach.sams.map((sam) => sam.id),
+  [10, 11, 12],
+);
+assert.deepEqual(
+  (await breachFor(true)).sams.map((sam) => sam.id),
+  [10],
+);
+targetOwner = enemyTarget;
+assert.deepEqual(
+  (await breachFor()).sams.map((sam) => sam.id),
+  [10, 11, 12],
+);
+assert.deepEqual(
+  (await breachFor(true)).sams.map((sam) => sam.id),
+  [11],
+);
+targetOwner = null;
+assert.deepEqual((await breachFor(true)).sams, []);
+assert.deepEqual(
+  (await breachFor()).sams.map((sam) => sam.id),
+  [10, 11, 12],
+);
+targetOwner = player;
+assert.equal((await breachFor()).protectedTarget, true);
+targetOwner = teammate;
+assert.equal((await breachFor()).protectedTarget, true);
+assert.equal(emitted.length, 2);
+rules.SAMCooldown = undefined;
+assert.equal(
+  (await request({ kind: "breachState", worldX: 800, worldY: 400 })).ready,
+  false,
+);
+
 emitted.length = 0;
 assert.deepEqual(
   await request({ kind: "upgrade", unitId: 1, unitType: "City", amount: 50 }),
-  { kind: "upgrade", id: 12, ready: true, sent: true },
+  { kind: "upgrade", id: nextId, ready: true, sent: true },
 );
 assert.equal(emitted[0] instanceof SendUpgradeStructureIntentEvent, true);
 assert.deepEqual({ ...emitted[0] }, { unitId: 1, unitType: "City", amount: 50 });
