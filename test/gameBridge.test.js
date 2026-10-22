@@ -32,8 +32,19 @@ class SendAllianceExtensionIntentEvent {
     this.recipient = recipient;
   }
 }
+class SendUpgradeStructureIntentEvent {
+  constructor(unitId, unitType, amount) {
+    this.unitId = unitId;
+    this.unitType = unitType;
+    this.amount = amount;
+  }
+}
 const eventBus = {
   listeners: new Map([
+    [
+      SendUpgradeStructureIntentEvent,
+      [function onSendUpgradeStructureIntent() {}],
+    ],
     [SendAllianceRequestIntentEvent, [function onSendAllianceRequest() {}]],
     [
       SendAllianceExtensionIntentEvent,
@@ -172,6 +183,13 @@ assert.equal(upgrade.canUpgrade, true);
 assert.equal(upgrade.worldX, 1);
 assert.equal(upgrade.worldY, 1);
 assert.equal(upgrade.targetUnitId, 1);
+assert.deepEqual(upgrade.upgradeCosts, [
+  "250000",
+  "750000",
+  "1500000",
+  "2500000",
+  "3500000",
+]);
 assert.deepEqual(upgrade.units, [
   { id: 1, level: 4 },
   { id: 2, level: 2 },
@@ -214,6 +232,7 @@ buildables = [
 ownedUnits = [];
 const atomBombs = await inspect("Atom Bomb", 5, true);
 assert.equal(atomBombs.batchCost, "3750000");
+assert.equal(atomBombs.upgradeCosts, null);
 assert.equal(atomBombs.readyMissiles, 4);
 
 assert.deepEqual(await request({ kind: "allianceState" }), {
@@ -425,5 +444,13 @@ assert.equal(
   (await request({ kind: "breachState", worldX: 800, worldY: 400 })).ready,
   false,
 );
+
+emitted.length = 0;
+assert.deepEqual(
+  await request({ kind: "upgrade", unitId: 1, unitType: "City", amount: 50 }),
+  { kind: "upgrade", id: nextId, ready: true, sent: true },
+);
+assert.equal(emitted[0] instanceof SendUpgradeStructureIntentEvent, true);
+assert.deepEqual({ ...emitted[0] }, { unitId: 1, unitType: "City", amount: 50 });
 
 console.log("gameBridge ok");

@@ -1,6 +1,6 @@
 // The server silently drops excess intents. Features share its full budget;
 // manual actions bypass this queue and can still push the total over the limit.
-import { sendAllianceAction } from "./game.js";
+import { sendAllianceAction, sendUpgrade } from "./game.js";
 
 const BUDGET_PER_SECOND = 10;
 const BUDGET_PER_MINUTE = 150;
@@ -106,6 +106,9 @@ const sendEnter = () =>
 
 export const confirmBuild = (featureId, options) =>
   enqueue(featureId, sendEnter, options);
+
+export const upgradeStructure = (featureId, unitId, action, amount, options) =>
+  enqueue(featureId, () => sendUpgrade(unitId, action, amount), options);
 
 export const requestAlliance = (recipient, options) =>
   enqueue(

@@ -125,6 +125,14 @@ export const quote = async (action, count) => {
   };
 };
 
+export const sendUpgrade = (unitId, action, amount) =>
+  ask({
+    kind: "upgrade",
+    unitId,
+    unitType: BUILDABLES[action].unitType,
+    amount,
+  });
+
 const TROOP_EXPONENT = 0.73;
 const TROOP_CURVE_ITERATIONS = 80;
 

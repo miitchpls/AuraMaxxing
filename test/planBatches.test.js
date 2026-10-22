@@ -5,6 +5,7 @@ import {
   confirmedBatchAmount,
   parseCount,
   planBatches,
+  upgradeAmount,
 } from "../src/features/buildMaxxing.js";
 
 const total = (batches) => batches.reduce((sum, size) => sum + size, 0);
@@ -17,11 +18,19 @@ assert.deepEqual(BUILDABLES.buildDefensePost, {
   repeatable: false,
 });
 
-assert.deepEqual(planBatches("buildWarship", 12, true), Array(12).fill(1));
-assert.deepEqual(planBatches("buildCity", 12, true), [1, 5, 5, 1]);
-assert.deepEqual(planBatches("buildCity", 12, false), [5, 5, 1, 1]);
-assert.deepEqual(planBatches("buildAtomBomb", 12, true), [5, 5, 1, 1]);
-assert.deepEqual(planBatches("buildCity", 1, true), [1]);
+assert.deepEqual(planBatches("buildWarship", 12), Array(12).fill(1));
+assert.deepEqual(planBatches("buildAtomBomb", 12), [5, 5, 1, 1]);
+assert.deepEqual(planBatches("buildAtomBomb", 1), [1]);
+
+const costs = ["100", "300", "700", "1500"];
+assert.deepEqual(upgradeAmount(costs, "1500", 10), { amount: 4, full: true });
+assert.deepEqual(upgradeAmount(costs, "1500", 2), { amount: 2, full: true });
+assert.deepEqual(upgradeAmount(costs, "699", 10), { amount: 2, full: false });
+assert.deepEqual(upgradeAmount(costs, "99", 3), { amount: 0, full: false });
+assert.deepEqual(
+  upgradeAmount(Array(50).fill("0"), "0", 120),
+  { amount: 50, full: true },
+);
 
 assert.equal(parseCount("5"), 5);
 assert.equal(parseCount("2.5"), null);
@@ -110,15 +119,9 @@ assert.equal(
   true,
 );
 
-for (const action of ["buildCity", "buildWarship", "buildAtomBomb"]) {
-  for (const firstIsBuild of [true, false]) {
-    for (let count = 1; count <= 30; count++) {
-      assert.equal(
-        total(planBatches(action, count, firstIsBuild)),
-        count,
-        `${action} ${count} ${firstIsBuild}`,
-      );
-    }
+for (const action of ["buildWarship", "buildAtomBomb"]) {
+  for (let count = 1; count <= 30; count++) {
+    assert.equal(total(planBatches(action, count)), count, `${action} ${count}`);
   }
 }
 

@@ -61,6 +61,7 @@ const inspect = async ({
     units,
     cost: String(unit.cost),
     batchCost: batchCost === undefined ? null : String(batchCost),
+    upgradeCosts: unit.upgradeCosts ? unit.upgradeCosts.map(String) : null,
     gold: String(player.gold()),
     readyMissiles: usesMissile ? player.readyMissileCount() : null,
   });
@@ -285,6 +286,22 @@ const allianceAction = async ({ id, action, recipient, token }) => {
   reply({ kind: "allianceAction", id, ready: true, sent: false });
 };
 
+const upgrade = async ({ id, unitId, unitType, amount }) => {
+  const element = document.querySelector(BUILD_MENU);
+  const eventBus = element?.eventBus;
+  const player = element?.game?.myPlayer?.();
+  const upgradeType = findEventType(
+    eventBus,
+    "SendUpgradeStructureIntentEvent",
+    "onSendUpgradeStructureIntent",
+  );
+  if (!player || !upgradeType) {
+    return reply({ kind: "upgrade", id, ready: false, sent: false });
+  }
+  eventBus.emit(new upgradeType(unitId, unitType, amount));
+  reply({ kind: "upgrade", id, ready: true, sent: true });
+};
+
 const breachState = async ({
   id,
   screenX,
@@ -459,6 +476,7 @@ const breachState = async ({
 const handlers = {
   breachState,
   quote,
+  upgrade,
   project,
   troops,
   allianceState,
