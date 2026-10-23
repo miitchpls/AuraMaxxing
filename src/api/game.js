@@ -88,6 +88,9 @@ const STARTING_COST = new Map([
 ]);
 
 export const projectCost = (unitType, base, count) => {
+  // The infinite gold modifier zeroes every price rather than granting gold, and
+  // the escalating types would otherwise climb from zero by their step.
+  if (base === 0n) return 0n;
   let price = base;
   let total = 0n;
   for (let i = 0; i < count; i++) {

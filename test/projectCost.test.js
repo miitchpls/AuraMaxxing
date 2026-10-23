@@ -25,4 +25,9 @@ assert.equal(projectCost("Hydrogen Bomb", 5000000n, 5), 25000000n);
 assert.equal(projectCost("Atom Bomb", 750000n, 4), 3000000n);
 assert.equal(projectCost("Missile Silo", 1000000n, 2), 2000000n);
 
+const ESCALATING = ["City", "Warship", "SAM Launcher", "MIRV", "Defense Post"];
+for (const unitType of ESCALATING) {
+  assert.equal(projectCost(unitType, 0n, 60), 0n);
+}
+
 console.log("projectCost ok");
