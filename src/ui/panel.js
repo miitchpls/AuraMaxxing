@@ -7,7 +7,7 @@ const WIDTH_PX = 220;
 // Tailwind classes are lifted from the game's own components: its stylesheet
 // only contains classes found in its source, so an invented one renders nothing.
 const PANEL_CLASS =
-  "fixed z-900 flex flex-col p-2 bg-gray-800/92 backdrop-blur-sm shadow-xs rounded-lg text-white select-none";
+  "fixed z-999 flex flex-col p-2 bg-gray-800/92 backdrop-blur-sm shadow-xs rounded-lg text-white select-none";
 const TOGGLE_CLASS =
   "cursor-pointer px-1 bg-gray-700/50 hover:bg-gray-600 border rounded-md border-slate-500 transition-colors";
 // One card per feature: the section is the card, everything it needs lives
