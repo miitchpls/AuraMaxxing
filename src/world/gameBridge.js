@@ -302,6 +302,59 @@ const upgrade = async ({ id, unitId, unitType, amount }) => {
   reply({ kind: "upgrade", id, ready: true, sent: true });
 };
 
+const NUKES_WITH_DIRECTION = new Set(["Atom Bomb", "Hydrogen Bomb"]);
+
+// Mirrors what the game does when its ghost structure is clicked: upgrade the
+// nearby structure unless stacking prevention is held, otherwise build.
+const flashBuild = async ({ id, screenX, screenY, unitType }) => {
+  const element = document.querySelector(BUILD_MENU);
+  const game = element?.game;
+  const eventBus = element?.eventBus;
+  const transform = element?.transformHandler;
+  const player = game?.myPlayer?.();
+  const buildType = findEventType(
+    eventBus,
+    "BuildUnitIntentEvent",
+    "onBuildUnitIntent",
+  );
+  const upgradeType = findEventType(
+    eventBus,
+    "SendUpgradeStructureIntentEvent",
+    "onSendUpgradeStructureIntent",
+  );
+  if (
+    !player?.isAlive() ||
+    game.inSpawnPhase() ||
+    !transform ||
+    !buildType ||
+    !upgradeType
+  ) {
+    return reply({ kind: "flashBuild", id, ready: false, sent: false });
+  }
+
+  const world = transform.screenToWorldCoordinates(screenX, screenY);
+  if (!world || !game.isValidCoord(world.x, world.y)) {
+    return reply({ kind: "flashBuild", id, ready: true, sent: false });
+  }
+  const tile = game.ref(world.x, world.y);
+  const found = await player.buildables(tile, [unitType]);
+  const unit = (Array.isArray(found) ? found : [found])[0];
+  const uiState = element.uiState;
+
+  if (unit && unit.canUpgrade !== false && !uiState?.preventStacking) {
+    eventBus.emit(new upgradeType(unit.canUpgrade, unitType, 1));
+    return reply({ kind: "flashBuild", id, ready: true, sent: true });
+  }
+  if (unit && unit.canBuild !== false) {
+    const rocketDirectionUp = NUKES_WITH_DIRECTION.has(unitType)
+      ? (uiState?.rocketDirectionUp ?? true)
+      : undefined;
+    eventBus.emit(new buildType(unitType, tile, rocketDirectionUp));
+    return reply({ kind: "flashBuild", id, ready: true, sent: true });
+  }
+  reply({ kind: "flashBuild", id, ready: true, sent: false });
+};
+
 const breachState = async ({
   id,
   screenX,
@@ -477,6 +530,7 @@ const handlers = {
   breachState,
   quote,
   upgrade,
+  flashBuild,
   project,
   troops,
   allianceState,

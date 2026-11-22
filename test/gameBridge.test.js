@@ -39,8 +39,16 @@ class SendUpgradeStructureIntentEvent {
     this.amount = amount;
   }
 }
+class BuildUnitIntentEvent {
+  constructor(unit, tile, rocketDirectionUp) {
+    this.unit = unit;
+    this.tile = tile;
+    this.rocketDirectionUp = rocketDirectionUp;
+  }
+}
 const eventBus = {
   listeners: new Map([
+    [BuildUnitIntentEvent, [function onBuildUnitIntent() {}]],
     [
       SendUpgradeStructureIntentEvent,
       [function onSendUpgradeStructureIntent() {}],
@@ -101,6 +109,7 @@ const game = {
   }),
   players: () => [player, other, bot, nation],
   isValidCoord: () => true,
+  inSpawnPhase: () => false,
   ref: (x, y) => {
     lastRef = { x, y };
     return { x, y };
@@ -115,12 +124,14 @@ const transformHandler = {
     y: y * 10 + projectOffset,
   }),
 };
+const uiState = { preventStacking: false, rocketDirectionUp: false };
 globalThis.document = {
   documentElement: { dataset: {} },
   querySelector: () => ({
     game,
     eventBus,
     transformHandler,
+    uiState,
   }),
 };
 
@@ -452,5 +463,43 @@ assert.deepEqual(
 );
 assert.equal(emitted[0] instanceof SendUpgradeStructureIntentEvent, true);
 assert.deepEqual({ ...emitted[0] }, { unitId: 1, unitType: "City", amount: 50 });
+
+const flash = (unitType) =>
+  request({ kind: "flashBuild", screenX: 10, screenY: 20, unitType });
+screenWorld = { x: 5, y: 6 };
+player.buildables = async () => buildables;
+
+emitted.length = 0;
+buildables = [{ canBuild: false, canUpgrade: 7, cost: 1n }];
+assert.deepEqual(await flash("City"), {
+  kind: "flashBuild",
+  id: nextId,
+  ready: true,
+  sent: true,
+});
+assert.equal(emitted[0] instanceof SendUpgradeStructureIntentEvent, true);
+assert.deepEqual({ ...emitted[0] }, { unitId: 7, unitType: "City", amount: 1 });
+
+emitted.length = 0;
+uiState.preventStacking = true;
+buildables = [{ canBuild: 42, canUpgrade: 7, cost: 1n }];
+assert.equal((await flash("City")).sent, true);
+assert.equal(emitted[0] instanceof BuildUnitIntentEvent, true);
+assert.deepEqual({ ...emitted[0] }, {
+  unit: "City",
+  tile: { x: 5, y: 6 },
+  rocketDirectionUp: undefined,
+});
+uiState.preventStacking = false;
+
+emitted.length = 0;
+buildables = [{ canBuild: 42, canUpgrade: false, cost: 1n }];
+await flash("Atom Bomb");
+assert.equal(emitted[0].rocketDirectionUp, false);
+
+emitted.length = 0;
+buildables = [{ canBuild: false, canUpgrade: false, cost: 1n }];
+assert.equal((await flash("Defense Post")).sent, false);
+assert.equal(emitted.length, 0);
 
 console.log("gameBridge ok");

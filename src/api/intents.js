@@ -1,6 +1,6 @@
 // The server silently drops excess intents. Features share its full budget;
 // manual actions bypass this queue and can still push the total over the limit.
-import { sendAllianceAction, sendUpgrade } from "./game.js";
+import { sendAllianceAction, sendFlashBuild, sendUpgrade } from "./game.js";
 
 const BUDGET_PER_SECOND = 10;
 const BUDGET_PER_MINUTE = 150;
@@ -10,7 +10,7 @@ const MINUTE_MS = 60000;
 // Ordered by urgency, most urgent first. Listing every feature is not required:
 // anything absent goes after the listed ones, in arrival order. Keep it short —
 // a listed feature that queues without pause starves everything below it.
-const PRIORITY = ["buildMaxxing"];
+const PRIORITY = ["flashMaxxing", "buildMaxxing"];
 
 export const available = () => true;
 
@@ -109,6 +109,9 @@ export const confirmBuild = (featureId, options) =>
 
 export const upgradeStructure = (featureId, unitId, action, amount, options) =>
   enqueue(featureId, () => sendUpgrade(unitId, action, amount), options);
+
+export const flashBuild = (x, y, action, options) =>
+  enqueue("flashMaxxing", () => sendFlashBuild(x, y, action), options);
 
 export const requestAlliance = (recipient, options) =>
   enqueue(

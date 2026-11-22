@@ -1,4 +1,4 @@
-import { BUILDABLES } from "./buildables.js";
+import { BUILD_ACTIONS, BUILDABLES } from "./buildables.js";
 import { keybinds, available as settingsAvailable } from "./settings.js";
 
 export const available = () => settingsAvailable();
@@ -141,3 +141,61 @@ export const pickMapPoint = ({ signal, exclude }) =>
     window.addEventListener("keydown", onKey, true);
     signal?.addEventListener("abort", onAbort, { once: true });
   });
+
+const isTextInput = (target) =>
+  target?.isContentEditable === true ||
+  ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName);
+
+// The game also accepts the numpad twin of a digit binding.
+const buildActionFor = (event) => {
+  if (event.ctrlKey || event.altKey || event.metaKey) return null;
+  for (const action of BUILD_ACTIONS) {
+    const value = binding(action);
+    if (value === undefined) continue;
+    if (value.startsWith("Shift+") !== event.shiftKey) continue;
+    const code = value.replace("Shift+", "");
+    if (
+      event.code === code ||
+      (code.startsWith("Digit") && event.code === `Numpad${code.slice(5)}`)
+    ) {
+      return action;
+    }
+  }
+  return null;
+};
+
+// Takes the player's build keys away from the game and reports each press with
+// the cursor position. Synthetic presses are left alone: other features drive
+// the game through the same keys.
+export const captureBuildKeys = (onPress) => {
+  const cursor = { x: 0, y: 0 };
+  const capturedAction = (event) =>
+    event.isTrusted && !isTextInput(event.target)
+      ? buildActionFor(event)
+      : null;
+  const onMove = (event) => {
+    cursor.x = event.clientX;
+    cursor.y = event.clientY;
+  };
+  const onKeyDown = (event) => {
+    const action = capturedAction(event);
+    if (action === null) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (!event.repeat) onPress(action, cursor.x, cursor.y);
+  };
+  const onKeyUp = (event) => {
+    if (capturedAction(event) !== null) event.stopImmediatePropagation();
+  };
+  window.addEventListener("pointermove", onMove, {
+    capture: true,
+    passive: true,
+  });
+  window.addEventListener("keydown", onKeyDown, true);
+  window.addEventListener("keyup", onKeyUp, true);
+  return () => {
+    window.removeEventListener("pointermove", onMove, true);
+    window.removeEventListener("keydown", onKeyDown, true);
+    window.removeEventListener("keyup", onKeyUp, true);
+  };
+};

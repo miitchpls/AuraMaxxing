@@ -136,6 +136,14 @@ export const sendUpgrade = (unitId, action, amount) =>
     amount,
   });
 
+export const sendFlashBuild = (x, y, action) =>
+  ask({
+    kind: "flashBuild",
+    screenX: x,
+    screenY: y,
+    unitType: BUILDABLES[action].unitType,
+  });
+
 const TROOP_EXPONENT = 0.73;
 const TROOP_CURVE_ITERATIONS = 80;
 
