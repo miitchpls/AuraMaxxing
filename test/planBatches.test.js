@@ -3,6 +3,7 @@ import { BUILDABLES, BUILD_ACTIONS } from "../src/api/buildables.js";
 import {
   batchAffordable,
   confirmedBatchAmount,
+  humanUpgradeDelay,
   parseCount,
   planBatches,
   upgradeAmount,
@@ -123,6 +124,15 @@ for (const action of ["buildWarship", "buildAtomBomb"]) {
   for (let count = 1; count <= 30; count++) {
     assert.equal(total(planBatches(action, count)), count, `${action} ${count}`);
   }
+}
+
+assert.equal(humanUpgradeDelay(1), 0);
+assert.equal(humanUpgradeDelay(5), 0);
+assert.equal(humanUpgradeDelay(6, () => 0), 1400);
+assert.equal(humanUpgradeDelay(50, () => 0.999), 2799);
+for (let i = 0; i < 100; i++) {
+  const delay = humanUpgradeDelay(50);
+  assert.ok(delay >= 1400 && delay < 2800);
 }
 
 console.log("planBatches ok");

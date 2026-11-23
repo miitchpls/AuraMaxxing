@@ -58,6 +58,7 @@ export function simulate(snapshot, bombs, { trace = false } = {}) {
   const config = {
     defaultSamMissileSpeed: () => rules.samSpeed,
     maxSamRange: () => rules.maxSamRange,
+    defaultNukeTargetableRange: () => rules.targetableRange,
     SAMCooldown: () => rules.samCooldown,
     gameConfig: () => ({ gameType: "Singleplayer" }),
     dynamicSamRange: (sam, at) => {
@@ -170,21 +171,18 @@ export function simulate(snapshot, bombs, { trace = false } = {}) {
       let nuke = null,
         index = 0,
         wait = bomb.firstMotion - bomb.created - 1;
-      const path = bomb.path.map((p) => ({
-        tile: map.ref(p.x, p.y),
-        targetable: p.targetable,
-      }));
+      const path = bomb.path.map((p) => map.ref(p.x, p.y));
       executions.push({
         isActive: () => nuke === null || nuke.isActive(),
         tick() {
           if (nuke === null) {
-            nuke = unit(ATOM, path[0].tile, attacker);
+            nuke = unit(ATOM, path[0], attacker);
             Object.assign(nuke, {
               bomb,
               trajectory: () => path,
               trajectoryIndex: () => index,
               nukeState: () => ({ waitTicks: wait }),
-              targetTile: () => path.at(-1).tile,
+              targetTile: () => path.at(-1),
             });
             return;
           }
@@ -193,7 +191,7 @@ export function simulate(snapshot, bombs, { trace = false } = {}) {
             return;
           }
           if (tick >= bomb.impact) {
-            nuke.move(path.at(-1).tile);
+            nuke.move(path.at(-1));
             const defended =
               game.nearbyUnits(
                 nuke.tile(),
@@ -209,7 +207,7 @@ export function simulate(snapshot, bombs, { trace = false } = {}) {
             return;
           }
           index = tick - bomb.firstMotion + 1;
-          nuke.move(path[index].tile);
+          nuke.move(path[index]);
         },
       });
     }

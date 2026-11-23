@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
-import { Config } from "../../src/core/configuration/Config";
-import { ConstructionExecution } from "../../src/core/execution/ConstructionExecution";
-import { MissileSiloExecution } from "../../src/core/execution/MissileSiloExecution";
-import { SAMLauncherExecution } from "../../src/core/execution/SAMLauncherExecution";
-import { PlayerInfo, PlayerType, UnitType } from "../../src/core/game/Game";
-import { createGame } from "../../src/core/game/GameImpl";
-import { GameMapImpl } from "../../src/core/game/GameMap";
+import {
+  PlayerInfo,
+  PlayerType,
+  UnitType,
+} from "@openfront/engine-api/game/GameTypes";
+import { GameMapImpl } from "@openfront/engine-lib/game/GameMapImpl";
+import { EngineConfig } from "@openfront/engine/configuration/EngineConfig";
+import { ConstructionExecution } from "@openfront/engine/execution/ConstructionExecution";
+import { MissileSiloExecution } from "@openfront/engine/execution/MissileSiloExecution";
+import { SAMLauncherExecution } from "@openfront/engine/execution/SAMLauncherExecution";
+import { createGame } from "@openfront/engine/game/GameImpl";
 import { makeSalvo, simulate, trajectory } from "../src/api/breachModel.js";
 console.debug = () => {};
 export function runScenario(options: any) {
@@ -34,7 +38,7 @@ export function runScenario(options: any) {
     new Uint8Array(60000).fill(128 | 10),
     60000,
   );
-  const cfg = new Config(
+  const cfg = new EngineConfig(
     {
       gameMap: "World",
       gameMapSize: "Normal",
@@ -51,7 +55,6 @@ export function runScenario(options: any) {
       disableNavMesh: true,
       waterNukes: false,
     } as any,
-    null,
     false,
   );
   const game: any = createGame([], [], map, mini, cfg);
@@ -140,12 +143,8 @@ export function runScenario(options: any) {
           snapshot.target,
           rules,
           direction,
-        ),
-        u.trajectory().map((p: any) => ({
-          x: game.x(p.tile),
-          y: game.y(p.tile),
-          targetable: p.targetable,
-        })),
+        ).map(({ x, y }) => ({ x, y })),
+        u.trajectory().map((p: any) => ({ x: game.x(p), y: game.y(p) })),
       );
       const row: any = {
         kind: "launch",

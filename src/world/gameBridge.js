@@ -302,6 +302,85 @@ const upgrade = async ({ id, unitId, unitType, amount }) => {
   reply({ kind: "upgrade", id, ready: true, sent: true });
 };
 
+const NUKES_WITH_DIRECTION = new Set(["Atom Bomb", "Hydrogen Bomb"]);
+
+// Mirrors what the game does when its ghost structure is clicked: upgrade the
+// nearby structure unless stacking prevention is held, otherwise build. A dry
+// run only resolves the tile and whether anything would happen there, so the
+// caller can pin the tile before queueing and skip a press that does nothing.
+const flashBuild = async ({
+  id,
+  screenX,
+  screenY,
+  worldX,
+  worldY,
+  unitType,
+  dryRun = false,
+}) => {
+  const element = document.querySelector(BUILD_MENU);
+  const game = element?.game;
+  const eventBus = element?.eventBus;
+  const transform = element?.transformHandler;
+  const player = game?.myPlayer?.();
+  const buildType = findEventType(
+    eventBus,
+    "BuildUnitIntentEvent",
+    "onBuildUnitIntent",
+  );
+  const upgradeType = findEventType(
+    eventBus,
+    "SendUpgradeStructureIntentEvent",
+    "onSendUpgradeStructureIntent",
+  );
+  if (
+    !player?.isAlive() ||
+    game.inSpawnPhase() ||
+    !transform ||
+    !buildType ||
+    !upgradeType
+  ) {
+    return reply({ kind: "flashBuild", id, ready: false, sent: false });
+  }
+
+  const world =
+    Number.isInteger(worldX) && Number.isInteger(worldY)
+      ? { x: worldX, y: worldY }
+      : transform.screenToWorldCoordinates(screenX, screenY);
+  if (!world || !game.isValidCoord(world.x, world.y)) {
+    return reply({ kind: "flashBuild", id, ready: true, sent: false });
+  }
+  const tile = game.ref(world.x, world.y);
+  const found = await player.buildables(tile, [unitType]);
+  const unit = (Array.isArray(found) ? found : [found])[0];
+  const uiState = element.uiState;
+  const upgrades =
+    unit !== undefined &&
+    unit.canUpgrade !== false &&
+    !uiState?.preventStacking;
+  const builds = !upgrades && unit !== undefined && unit.canBuild !== false;
+  const done = (sent) =>
+    reply({
+      kind: "flashBuild",
+      id,
+      ready: true,
+      sent,
+      possible: upgrades || builds,
+      worldX: world.x,
+      worldY: world.y,
+    });
+
+  if (dryRun || (!upgrades && !builds)) return done(false);
+  if (upgrades) {
+    eventBus.emit(new upgradeType(unit.canUpgrade, unitType, 1));
+  } else {
+    const rocketDirectionUp = NUKES_WITH_DIRECTION.has(unitType)
+      ? (uiState?.rocketDirectionUp ?? true)
+      : undefined;
+    eventBus.emit(new buildType(unitType, tile, rocketDirectionUp));
+  }
+  done(true);
+};
+
 const breachState = async ({
   id,
   screenX,
@@ -477,6 +556,7 @@ const handlers = {
   breachState,
   quote,
   upgrade,
+  flashBuild,
   project,
   troops,
   allianceState,

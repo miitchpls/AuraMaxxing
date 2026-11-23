@@ -102,3 +102,70 @@ listeners.get("pointerdown")(overlayEvent);
 listeners.get("pointerup")(overlayEvent);
 assert.deepEqual(await overlayPick, { x: 40, y: 50 });
 assert.equal(listeners.size, 0);
+
+const { captureBuildKeys } = await import("../src/api/input.js");
+const presses = [];
+const release = captureBuildKeys((...args) => presses.push(args));
+const key = (type, code, extra = {}) => {
+  const event = {
+    type,
+    code,
+    isTrusted: true,
+    shiftKey: false,
+    target: { tagName: "CANVAS" },
+    stopped: false,
+    preventDefault() {},
+    stopImmediatePropagation() {
+      this.stopped = true;
+    },
+    ...extra,
+  };
+  listeners.get(type)(event);
+  return event;
+};
+stored = "{}";
+assert.equal(key("keydown", "Digit4").stopped, false);
+listeners.get("pointermove")({ clientX: 300, clientY: 400 });
+assert.equal(key("keydown", "Digit4").stopped, true);
+assert.equal(key("keyup", "Digit4").stopped, true);
+assert.equal(key("keydown", "Numpad1").stopped, true);
+assert.equal(key("keydown", "Digit4", { repeat: true }).stopped, true);
+assert.equal(key("keydown", "Digit4", { shiftKey: true }).stopped, false);
+assert.equal(key("keydown", "Digit4", { isTrusted: false }).stopped, false);
+assert.equal(
+  key("keydown", "Digit4", { target: { tagName: "INPUT" } }).stopped,
+  false,
+);
+assert.equal(
+  key("keydown", "Digit4", {
+    target: { tagName: "BUTTON", closest: (s) => s === "setting-keybind" },
+  }).stopped,
+  false,
+);
+assert.equal(key("keydown", "KeyQ").stopped, false);
+assert.equal(key("keyup", "KeyQ").stopped, false);
+
+stored = JSON.stringify({
+  buildCity: { value: "Numpad1" },
+  buildFactory: { value: "Shift+KeyC" },
+  buildPort: { value: "KeyC" },
+});
+assert.equal(key("keydown", "Digit1").stopped, true);
+key("keyup", "Digit1");
+assert.equal(key("keydown", "KeyC", { shiftKey: true }).stopped, true);
+assert.equal(key("keyup", "KeyC").stopped, true);
+assert.equal(key("keyup", "KeyC").stopped, false);
+
+stored = JSON.stringify({ buildFactory: { value: "Numpad1" } });
+key("keydown", "Numpad1");
+assert.deepEqual(presses, [
+  ["buildDefensePost", 300, 400],
+  ["buildCity", 300, 400],
+  ["buildCity", 300, 400],
+  ["buildFactory", 300, 400],
+  ["buildFactory", 300, 400],
+]);
+release();
+assert.equal(listeners.size, 0);
+
+console.log("captureBuildKeys ok");
