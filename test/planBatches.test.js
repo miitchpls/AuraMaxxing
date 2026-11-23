@@ -129,10 +129,10 @@ for (const action of ["buildWarship", "buildAtomBomb"]) {
 assert.equal(humanUpgradeDelay(1), 0);
 assert.equal(humanUpgradeDelay(5), 0);
 assert.equal(humanUpgradeDelay(6, () => 0), 1400);
-assert.equal(humanUpgradeDelay(50, () => 1), 2800);
+assert.equal(humanUpgradeDelay(50, () => 0.999), 2799);
 for (let i = 0; i < 100; i++) {
   const delay = humanUpgradeDelay(50);
-  assert.ok(delay >= 1400 && delay <= 2800);
+  assert.ok(delay >= 1400 && delay < 2800);
 }
 
 console.log("planBatches ok");

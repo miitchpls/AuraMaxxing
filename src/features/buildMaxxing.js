@@ -248,10 +248,9 @@ const runUpgrades = async (point, action, count, signal, progress) => {
   let done = 0;
   let lastSend = 0;
   let deadline = Date.now() + POLL_TIMEOUT_MS;
-  let paced = false;
   while (done < count) {
     if (signal.aborted) throw signal.reason;
-    const state = await inspectWorld(point.x, point.y, action);
+    let state = await inspectWorld(point.x, point.y, action);
     if (signal.aborted) throw signal.reason;
     if (!state.ready || !state.valid) {
       return { done, blocked: "game not ready" };
@@ -261,9 +260,11 @@ const runUpgrades = async (point, action, count, signal, progress) => {
       state.targetUnitId !== null &&
       state.targetUnitId !== undefined &&
       Array.isArray(state.upgradeCosts);
-    const { amount, full } = upgradable
+    const plan = upgradable
       ? upgradeAmount(state.upgradeCosts, state.gold, count - done)
       : { amount: 0, full: false };
+    const { full } = plan;
+    let { amount } = plan;
     if (amount === 0 || (!full && Date.now() - lastSend < PARTIAL_UPGRADE_MS)) {
       if (Date.now() > deadline) {
         return {
@@ -275,16 +276,29 @@ const runUpgrades = async (point, action, count, signal, progress) => {
       continue;
     }
 
-    // The gold and the target can change while we pace, so the amount is taken
-    // again from a fresh look once the delay is over.
-    const delay = paced ? 0 : humanUpgradeDelay(amount);
+    // Gold and the target can change during the clicks. The amount may shrink
+    // but never grow past what the delay was paced for.
+    const delay = humanUpgradeDelay(amount);
     if (delay > 0) {
-      progress(done, "pacing");
+      progress(done, "clicking");
       await wait(delay, signal);
-      paced = true;
-      continue;
+      const fresh = await inspectWorld(point.x, point.y, action);
+      if (signal.aborted) throw signal.reason;
+      if (
+        !fresh.ready ||
+        !fresh.valid ||
+        fresh.targetUnitId !== state.targetUnitId ||
+        !Array.isArray(fresh.upgradeCosts)
+      ) {
+        return { done, blocked: "target changed" };
+      }
+      state = fresh;
+      amount = Math.min(
+        amount,
+        upgradeAmount(state.upgradeCosts, state.gold, count - done).amount,
+      );
+      if (amount === 0) continue;
     }
-    paced = false;
 
     const sent = await upgradeStructure(
       "buildMaxxing",
