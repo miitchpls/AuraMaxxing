@@ -45,6 +45,11 @@ const UPGRADE_POLL_MS = 100;
 // A batch the gold cannot fully cover yet goes out at most this often, so a slow
 // trickle of income does not turn into a stream of tiny intents.
 const PARTIAL_UPGRADE_MS = 1000;
+// Past x5 the only way a human gets there is the radial menu: right click, the
+// build entry, the structure, the amount. Sending a bigger upgrade any sooner
+// is a speed nobody else in the match could reach by hand.
+const RADIAL_MENU_CLICKS = 4;
+const CLICK_MS = { min: 350, max: 700 };
 
 const wait = (ms, signal) =>
   new Promise((resolve, reject) => {
@@ -77,6 +82,15 @@ const chunk = (count) => [
 
 export const planBatches = (action, count) =>
   BUILDABLES[action].batching === "build" ? chunk(count) : Array(count).fill(1);
+
+export const humanUpgradeDelay = (amount, random = Math.random) => {
+  if (amount <= BATCH_SIZE) return 0;
+  let total = 0;
+  for (let i = 0; i < RADIAL_MENU_CLICKS; i++) {
+    total += CLICK_MS.min + random() * (CLICK_MS.max - CLICK_MS.min);
+  }
+  return Math.round(total);
+};
 
 // `costs` are the game's running totals for 1..N upgrades in one intent.
 export const upgradeAmount = (costs, gold, remaining) => {
@@ -234,6 +248,7 @@ const runUpgrades = async (point, action, count, signal, progress) => {
   let done = 0;
   let lastSend = 0;
   let deadline = Date.now() + POLL_TIMEOUT_MS;
+  let paced = false;
   while (done < count) {
     if (signal.aborted) throw signal.reason;
     const state = await inspectWorld(point.x, point.y, action);
@@ -259,6 +274,17 @@ const runUpgrades = async (point, action, count, signal, progress) => {
       await wait(UPGRADE_POLL_MS, signal);
       continue;
     }
+
+    // The gold and the target can change while we pace, so the amount is taken
+    // again from a fresh look once the delay is over.
+    const delay = paced ? 0 : humanUpgradeDelay(amount);
+    if (delay > 0) {
+      progress(done, "pacing");
+      await wait(delay, signal);
+      paced = true;
+      continue;
+    }
+    paced = false;
 
     const sent = await upgradeStructure(
       "buildMaxxing",
