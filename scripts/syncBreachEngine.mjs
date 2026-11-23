@@ -3,16 +3,58 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "../../node_modules/esbuild/lib/main.js";
-import ts from "../../node_modules/typescript/lib/typescript.js";
+import { parseSync } from "../../node_modules/oxc-parser/src-js/index.js";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const parent = path.resolve(root, "..");
+
+const declaredName = (statement) => {
+  const declaration = statement.declaration ?? statement;
+  return (
+    declaration.id?.name ?? declaration.declarations?.[0]?.id?.name ?? null
+  );
+};
+
+const valueExports = (program) =>
+  program.body.flatMap((statement) => {
+    if (statement.type !== "ExportNamedDeclaration") return [];
+    if (statement.exportKind === "type") return [];
+    if (statement.declaration) {
+      const { type } = statement.declaration;
+      if (type === "TSInterfaceDeclaration" || type === "TSTypeAliasDeclaration")
+        return [];
+      return [declaredName(statement)];
+    }
+    return statement.specifiers
+      .filter((specifier) => specifier.exportKind !== "type")
+      .map((specifier) => specifier.exported.name);
+  });
+
+// Snapshot schemas are built at module load, so their code cannot be shaken
+// out. The simulation never snapshots; a value that absorbs every use stands in.
+const STUB = `const stub = new Proxy(function () {}, {
+  get: (_, key) => (key === "then" || typeof key === "symbol" ? undefined : stub),
+  apply: () => stub,
+  construct: () => stub,
+});`;
+const stubModule = (names) =>
+  `${STUB}\n${names.map((name) => `export const ${name} = stub;`).join("\n")}`;
+
+const KEPT = [
+  {
+    filter: /\/engine-api\/src\/game\/GameTypes\.ts$/,
+    names: ["UnitType", "GameType", "MessageType"],
+  },
+  { filter: /\/engine\/src\/game\/Game\.ts$/, names: ["isUnit"] },
+  { filter: /\/engine-lib\/src\/Util\.ts$/, names: ["within"] },
+];
+
 const result = await build({
   absWorkingDir: parent,
   stdin: {
-    contents: `export { SAMLauncherExecution } from './src/core/execution/SAMLauncherExecution';
-export { ParabolaUniversalPathFinder } from './src/core/pathfinding/PathFinder.Parabola';
-export { UnitGrid } from './src/core/game/UnitGrid';`,
+    contents: `export { SAMLauncherExecution } from '@openfront/engine/execution/SAMLauncherExecution';
+export { ParabolaUniversalPathFinder } from '@openfront/engine/pathfinding/PathFinder.Parabola';
+export { UnitGrid } from '@openfront/engine-lib/game/UnitGrid';`,
     resolveDir: parent,
     loader: "ts",
   },
@@ -26,30 +68,41 @@ export { UnitGrid } from './src/core/game/UnitGrid';`,
     {
       name: "air-path-only",
       setup(builder) {
+        builder.onResolve({ filter: /^zod$/ }, () => ({
+          path: "zod",
+          namespace: "stub",
+        }));
+        builder.onLoad({ filter: /.*/, namespace: "stub" }, () => ({
+          loader: "js",
+          contents: stubModule(["z"]),
+        }));
+
         builder.onLoad(
-          { filter: /\/core\/(Util|game\/Game)\.ts$/ },
+          { filter: /\/snapshot\/[^/]+\.ts$|\/StatsSchemas\.ts$/ },
           async (args) => {
             const source = await readFile(args.path, "utf8");
-            const parsed = ts.createSourceFile(
-              args.path,
-              source,
-              ts.ScriptTarget.Latest,
-              true,
-            );
-            const names = args.path.endsWith("/Util.ts")
-              ? ["within"]
-              : ["UnitType", "GameType", "MessageType", "isUnit"];
-            const selected = parsed.statements.filter((s) =>
-              names.includes(s.name?.text),
-            );
-            if (selected.length !== names.length)
-              throw new Error("OpenFront engine exports changed");
-            return {
-              loader: "ts",
-              contents: selected.map((s) => s.getText(parsed)).join("\n"),
-            };
+            const { program } = parseSync(args.path, source);
+            return { loader: "js", contents: stubModule(valueExports(program)) };
           },
         );
+
+        for (const { filter, names } of KEPT) {
+          builder.onLoad({ filter }, async (args) => {
+            const source = await readFile(args.path, "utf8");
+            const { program } = parseSync(args.path, source);
+            const selected = program.body.filter((statement) =>
+              names.includes(declaredName(statement)),
+            );
+            if (selected.length !== names.length)
+              throw new Error(`OpenFront engine exports changed: ${args.path}`);
+            return {
+              loader: "ts",
+              contents: selected
+                .map((statement) => source.slice(statement.start, statement.end))
+                .join("\n"),
+            };
+          });
+        }
 
         builder.onLoad(
           { filter: /\/pathfinding\/PathFinder\.ts$/ },
@@ -77,13 +130,15 @@ export class PathFinding { ${source.slice(start, end)} }
 const hashes = {};
 for (const name of [
   ...new Set([
-    ...Object.keys(result.metafile.inputs).filter((p) => p !== "<stdin>"),
-    "src/core/execution/NukeExecution.ts",
-    "src/core/execution/ConstructionExecution.ts",
-    "src/core/execution/MissileSiloExecution.ts",
-    "src/core/configuration/Config.ts",
-    "src/core/game/PlayerImpl.ts",
-    "src/core/game/UnitImpl.ts",
+    ...Object.keys(result.metafile.inputs).filter(
+      (p) => p !== "<stdin>" && !p.startsWith("stub:"),
+    ),
+    "packages/engine/src/execution/NukeExecution.ts",
+    "packages/engine/src/execution/ConstructionExecution.ts",
+    "packages/engine/src/execution/MissileSiloExecution.ts",
+    "packages/engine-lib/src/configuration/Config.ts",
+    "packages/engine/src/game/PlayerImpl.ts",
+    "packages/engine/src/game/UnitImpl.ts",
   ]),
 ].sort()) {
   hashes[name] = createHash("sha256")
