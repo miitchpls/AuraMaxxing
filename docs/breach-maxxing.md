@@ -51,11 +51,3 @@ results, not universal formulas: moving the launch site changes the outcome.
 
 Page-world imports exercise the real game and panel but do not validate Chrome's
 isolated-world boundary. A real extension reload is required for that last check.
-
-## Screenshots
-
-Same local fixture and 1400 × 1000 viewport, without and with the extension.
-
-![Without AuraMaxxing](images/breach-before.png)
-
-![With BreachMaxxing](images/breach-after.png)
