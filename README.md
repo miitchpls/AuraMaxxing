@@ -9,17 +9,16 @@ open during a match.
 
 ## Features
 
-Features that act for you are **off until you turn them on**. Everything else
-only reads the game.
+Features that act for you are **off until you turn them on**.
 
-| Feature | What it does | Acts for you |
-| --- | --- | --- |
-| **BuildMaxxing** | Pick a structure and a count, click a tile: it builds or upgrades until the count is reached, buying the largest batch your gold allows. It waits for gold and for construction to finish, and paces bulk upgrades to the speed of the radial menu. | yes |
-| **FlashMaxxing** | While on, a build key builds right away under the cursor, with no click. Over one of your structures it upgrades it, like clicking the ghost structure. | yes |
-| **HippieMaxxing** | Sends alliance requests and extends expiring alliances on its own. | yes |
-| **BreachMaxxing** | Pick a target: it finds the cheapest atom-bomb salvo that gets through the SAMs defending it, with silo positions, levels, direction and gold cost. It simulates the game's own SAM code ([details](docs/breach-maxxing.md)) and sends nothing. | no |
-| **PeakMaxxing** | Shows troop growth against its maximum, and where you sit relative to the troop count that maximises it. | no |
-| **AdMaxxing** | Removes the ad containers and blocks the anti-adblock script, so the game runs with no banner and no nag. | no |
+| Feature | What it does |
+| --- | --- |
+| **BuildMaxxing** | Pick a structure and a count, click a tile: it builds or upgrades until the count is reached, buying the largest batch your gold allows. It waits for gold and for construction to finish, and paces bulk upgrades to the speed of the radial menu. |
+| **FlashMaxxing** | While on, a build key builds right away under the cursor, with no click. Over one of your structures it upgrades it, like clicking the ghost structure. |
+| **HippieMaxxing** | Sends alliance requests and extends expiring alliances on its own. |
+| **BreachMaxxing** | Pick a target: it finds the cheapest atom-bomb salvo that gets through the SAMs defending it, with silo positions, levels, direction and gold cost. It simulates the game's own SAM code ([details](docs/breach-maxxing.md)) and sends nothing. |
+| **PeakMaxxing** | Shows troop growth against its maximum, and where you sit relative to the troop count that maximises it. |
+| **AdMaxxing** | Removes the ad containers and blocks the anti-adblock script, so the game runs with no banner and no nag. |
 
 ## Install
 
