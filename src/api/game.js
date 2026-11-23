@@ -136,11 +136,20 @@ export const sendUpgrade = (unitId, action, amount) =>
     amount,
   });
 
-export const sendFlashBuild = (x, y, action) =>
+export const planFlashBuild = (x, y, action) =>
   ask({
     kind: "flashBuild",
     screenX: x,
     screenY: y,
+    unitType: BUILDABLES[action].unitType,
+    dryRun: true,
+  });
+
+export const sendFlashBuild = (worldX, worldY, action) =>
+  ask({
+    kind: "flashBuild",
+    worldX,
+    worldY,
     unitType: BUILDABLES[action].unitType,
   });
 

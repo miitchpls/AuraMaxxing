@@ -1,6 +1,11 @@
 // The server silently drops excess intents. Features share its full budget;
 // manual actions bypass this queue and can still push the total over the limit.
-import { sendAllianceAction, sendFlashBuild, sendUpgrade } from "./game.js";
+import {
+  planFlashBuild,
+  sendAllianceAction,
+  sendFlashBuild,
+  sendUpgrade,
+} from "./game.js";
 
 const BUDGET_PER_SECOND = 10;
 const BUDGET_PER_MINUTE = 150;
@@ -110,8 +115,18 @@ export const confirmBuild = (featureId, options) =>
 export const upgradeStructure = (featureId, unitId, action, amount, options) =>
   enqueue(featureId, () => sendUpgrade(unitId, action, amount), options);
 
-export const flashBuild = (x, y, action, options) =>
-  enqueue("flashMaxxing", () => sendFlashBuild(x, y, action), options);
+// The tile is pinned at the press: by the time a queued entry runs, the map may
+// have panned under the same screen point. A press that would do nothing never
+// takes a slot.
+export const flashBuild = async (x, y, action, options) => {
+  const plan = await planFlashBuild(x, y, action);
+  if (!plan.possible) return plan;
+  return enqueue(
+    "flashMaxxing",
+    () => sendFlashBuild(plan.worldX, plan.worldY, action),
+    options,
+  );
+};
 
 export const requestAlliance = (recipient, options) =>
   enqueue(

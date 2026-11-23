@@ -8,22 +8,27 @@ import { parseSync } from "../../node_modules/oxc-parser/src-js/index.js";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const parent = path.resolve(root, "..");
 
-const declaredName = (statement) => {
+const declaredNames = (statement) => {
   const declaration = statement.declaration ?? statement;
-  return (
-    declaration.id?.name ?? declaration.declarations?.[0]?.id?.name ?? null
-  );
+  if (declaration.id?.name) return [declaration.id.name];
+  return (declaration.declarations ?? []).map((d) => d.id?.name);
 };
 
 const valueExports = (program) =>
   program.body.flatMap((statement) => {
+    if (
+      (statement.type === "ExportAllDeclaration" &&
+        statement.exportKind !== "type") ||
+      statement.type === "ExportDefaultDeclaration"
+    )
+      throw new Error("OpenFront snapshot module shape changed");
     if (statement.type !== "ExportNamedDeclaration") return [];
     if (statement.exportKind === "type") return [];
     if (statement.declaration) {
       const { type } = statement.declaration;
       if (type === "TSInterfaceDeclaration" || type === "TSTypeAliasDeclaration")
         return [];
-      return [declaredName(statement)];
+      return declaredNames(statement);
     }
     return statement.specifiers
       .filter((specifier) => specifier.exportKind !== "type")
@@ -91,9 +96,10 @@ export { UnitGrid } from '@openfront/engine-lib/game/UnitGrid';`,
             const source = await readFile(args.path, "utf8");
             const { program } = parseSync(args.path, source);
             const selected = program.body.filter((statement) =>
-              names.includes(declaredName(statement)),
+              declaredNames(statement).some((name) => names.includes(name)),
             );
-            if (selected.length !== names.length)
+            const found = selected.flatMap(declaredNames);
+            if (!names.every((name) => found.includes(name)))
               throw new Error(`OpenFront engine exports changed: ${args.path}`);
             return {
               loader: "ts",

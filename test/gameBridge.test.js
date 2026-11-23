@@ -476,6 +476,9 @@ assert.deepEqual(await flash("City"), {
   id: nextId,
   ready: true,
   sent: true,
+  possible: true,
+  worldX: 5,
+  worldY: 6,
 });
 assert.equal(emitted[0] instanceof SendUpgradeStructureIntentEvent, true);
 assert.deepEqual({ ...emitted[0] }, { unitId: 7, unitType: "City", amount: 1 });
@@ -499,7 +502,27 @@ assert.equal(emitted[0].rocketDirectionUp, false);
 
 emitted.length = 0;
 buildables = [{ canBuild: false, canUpgrade: false, cost: 1n }];
-assert.equal((await flash("Defense Post")).sent, false);
+const nothing = await flash("Defense Post");
+assert.equal(nothing.sent, false);
+assert.equal(nothing.possible, false);
 assert.equal(emitted.length, 0);
+
+buildables = [{ canBuild: 42, canUpgrade: false, cost: 1n }];
+const plan = await request({
+  kind: "flashBuild",
+  screenX: 10,
+  screenY: 20,
+  unitType: "City",
+  dryRun: true,
+});
+assert.deepEqual(
+  { possible: plan.possible, sent: plan.sent, x: plan.worldX, y: plan.worldY },
+  { possible: true, sent: false, x: 5, y: 6 },
+);
+assert.equal(emitted.length, 0);
+
+screenWorld = { x: 9, y: 9 };
+await request({ kind: "flashBuild", worldX: 5, worldY: 6, unitType: "City" });
+assert.deepEqual(emitted[0].tile, { x: 5, y: 6 });
 
 console.log("gameBridge ok");

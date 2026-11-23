@@ -3,13 +3,15 @@ import { keybinds, available as settingsAvailable } from "./settings.js";
 
 export const available = () => settingsAvailable();
 
-const binding = (action) => {
-  const stored = keybinds()[action];
-  const value = stored?.value ?? (Array.isArray(stored) ? stored[0] : stored);
+const bindingIn = (stored, action) => {
+  const entry = stored[action];
+  const value = entry?.value ?? (Array.isArray(entry) ? entry[0] : entry);
   if (value === "Null") return undefined;
   if (typeof value === "string") return value;
   return BUILDABLES[action]?.key;
 };
+
+const binding = (action) => bindingIn(keybinds(), action);
 
 const sendKey = (type, code, shiftKey) =>
   window.dispatchEvent(
@@ -142,50 +144,65 @@ export const pickMapPoint = ({ signal, exclude }) =>
     signal?.addEventListener("abort", onAbort, { once: true });
   });
 
-const isTextInput = (target) =>
-  target?.isContentEditable === true ||
-  ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName);
+// The same targets the game keeps its keybinds away from, the in-game keybind
+// editor included.
+const isTextInput = (target) => {
+  if (!target) return false;
+  if (typeof target.closest === "function" && target.closest("setting-keybind"))
+    return true;
+  if (target.tagName === "TEXTAREA" || target.isContentEditable === true)
+    return true;
+  return target.tagName === "INPUT" && target.type !== "range";
+};
 
-// The game also accepts the numpad twin of a digit binding.
+const digitOf = (code) => /^(?:Digit|Numpad)([0-9])$/.exec(code)?.[1] ?? null;
+
+// Resolved the way the game does: an exact binding wins, then a digit matches
+// its numpad twin and the other way around.
 const buildActionFor = (event) => {
   if (event.ctrlKey || event.altKey || event.metaKey) return null;
-  for (const action of BUILD_ACTIONS) {
-    const value = binding(action);
-    if (value === undefined) continue;
-    if (value.startsWith("Shift+") !== event.shiftKey) continue;
-    const code = value.replace("Shift+", "");
-    if (
-      event.code === code ||
-      (code.startsWith("Digit") && event.code === `Numpad${code.slice(5)}`)
-    ) {
-      return action;
-    }
-  }
-  return null;
+  const stored = keybinds();
+  const bound = BUILD_ACTIONS.flatMap((action) => {
+    const value = bindingIn(stored, action);
+    if (value === undefined) return [];
+    return [
+      {
+        action,
+        shift: value.startsWith("Shift+"),
+        code: value.replace("Shift+", ""),
+      },
+    ];
+  }).filter(({ shift }) => shift === event.shiftKey);
+  const exact = bound.find(({ code }) => code === event.code);
+  if (exact) return exact.action;
+  const digit = digitOf(event.code);
+  if (digit === null) return null;
+  return bound.find(({ code }) => digitOf(code) === digit)?.action ?? null;
 };
 
 // Takes the player's build keys away from the game and reports each press with
 // the cursor position. Synthetic presses are left alone: other features drive
-// the game through the same keys.
+// the game through the same keys. A key pressed before the cursor has been seen
+// has nowhere to go, and is handed back to the game.
 export const captureBuildKeys = (onPress) => {
-  const cursor = { x: 0, y: 0 };
-  const capturedAction = (event) =>
-    event.isTrusted && !isTextInput(event.target)
-      ? buildActionFor(event)
-      : null;
+  let cursor = null;
+  const held = new Set();
   const onMove = (event) => {
-    cursor.x = event.clientX;
-    cursor.y = event.clientY;
+    cursor = { x: event.clientX, y: event.clientY };
   };
   const onKeyDown = (event) => {
-    const action = capturedAction(event);
+    if (!event.isTrusted || cursor === null || isTextInput(event.target)) return;
+    const action = buildActionFor(event);
     if (action === null) return;
     event.preventDefault();
     event.stopImmediatePropagation();
+    held.add(event.code);
     if (!event.repeat) onPress(action, cursor.x, cursor.y);
   };
+  // The game acts on keyup, so the release of a captured key is swallowed
+  // whatever modifiers have changed since the press.
   const onKeyUp = (event) => {
-    if (capturedAction(event) !== null) event.stopImmediatePropagation();
+    if (held.delete(event.code)) event.stopImmediatePropagation();
   };
   window.addEventListener("pointermove", onMove, {
     capture: true,

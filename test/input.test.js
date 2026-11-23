@@ -124,6 +124,7 @@ const key = (type, code, extra = {}) => {
   return event;
 };
 stored = "{}";
+assert.equal(key("keydown", "Digit4").stopped, false);
 listeners.get("pointermove")({ clientX: 300, clientY: 400 });
 assert.equal(key("keydown", "Digit4").stopped, true);
 assert.equal(key("keyup", "Digit4").stopped, true);
@@ -135,10 +136,34 @@ assert.equal(
   key("keydown", "Digit4", { target: { tagName: "INPUT" } }).stopped,
   false,
 );
+assert.equal(
+  key("keydown", "Digit4", {
+    target: { tagName: "BUTTON", closest: (s) => s === "setting-keybind" },
+  }).stopped,
+  false,
+);
 assert.equal(key("keydown", "KeyQ").stopped, false);
+assert.equal(key("keyup", "KeyQ").stopped, false);
+
+stored = JSON.stringify({
+  buildCity: { value: "Numpad1" },
+  buildFactory: { value: "Shift+KeyC" },
+  buildPort: { value: "KeyC" },
+});
+assert.equal(key("keydown", "Digit1").stopped, true);
+key("keyup", "Digit1");
+assert.equal(key("keydown", "KeyC", { shiftKey: true }).stopped, true);
+assert.equal(key("keyup", "KeyC").stopped, true);
+assert.equal(key("keyup", "KeyC").stopped, false);
+
+stored = JSON.stringify({ buildFactory: { value: "Numpad1" } });
+key("keydown", "Numpad1");
 assert.deepEqual(presses, [
   ["buildDefensePost", 300, 400],
   ["buildCity", 300, 400],
+  ["buildCity", 300, 400],
+  ["buildFactory", 300, 400],
+  ["buildFactory", 300, 400],
 ]);
 release();
 assert.equal(listeners.size, 0);

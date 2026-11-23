@@ -2,21 +2,25 @@ import { captureBuildKeys } from "../api/input.js";
 import { flashBuild } from "../api/intents.js";
 import { addSection } from "../ui/panel.js";
 
-let releaseKeys = null;
+let activeRun = null;
 let removeSection = null;
 
-const build = (action, x, y) =>
-  flashBuild(x, y, action).catch((error) =>
-    console.error("[AuraMaxxing] flashMaxxing build failed", error),
-  );
-
 const start = () => {
-  releaseKeys ??= captureBuildKeys(build);
+  if (activeRun !== null) return;
+  const controller = new AbortController();
+  const build = (action, x, y) =>
+    flashBuild(x, y, action, { signal: controller.signal }).catch((error) => {
+      if (!controller.signal.aborted) {
+        console.error("[AuraMaxxing] flashMaxxing build failed", error);
+      }
+    });
+  activeRun = { controller, releaseKeys: captureBuildKeys(build) };
 };
 
 const stop = () => {
-  releaseKeys?.();
-  releaseKeys = null;
+  activeRun?.releaseKeys();
+  activeRun?.controller.abort();
+  activeRun = null;
 };
 
 const buildBody = () => {
